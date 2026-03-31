@@ -1,0 +1,15 @@
+{
+  "domain": "solem_bt_controller",
+  "name": "Solem BT Watering Controller",
+  "codeowners": [],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "",
+  "iot_class": "local_polling",
+  "requirements": [
+    "bleak>=0.22.3",
+    "bleak-retry-connector>=3.6.0",
+    "tenacity>=8.0.0"
+  ],
+  "version": "2.0.0"
+}

@@ -1,0 +1,156 @@
+"""DataUpdateCoordinator for Solem BT Controller."""
+
+import asyncio
+import logging
+
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+
+from .api import APIConnectionError, SolemBleApi
+from .const import (
+    CONF_BLUETOOTH_TIMEOUT,
+    CONF_CONTROLLER_MAC,
+    CONF_NUM_STATIONS,
+    DEFAULT_BLUETOOTH_TIMEOUT,
+    DEFAULT_SAFETY_DURATION,
+    DOMAIN,
+)
+from .models import IrrigationController, IrrigationStation
+
+_LOGGER = logging.getLogger(__name__)
+
+
+class SolemCoordinator(DataUpdateCoordinator):
+    """Manages state and BLE commands for the Solem controller."""
+
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
+        super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=None)
+
+        self.mac_address: str = entry.data[CONF_CONTROLLER_MAC]
+        self.num_stations: int = entry.data[CONF_NUM_STATIONS]
+        bt_timeout = entry.options.get(CONF_BLUETOOTH_TIMEOUT, DEFAULT_BLUETOOTH_TIMEOUT)
+
+        self.api = SolemBleApi(self.mac_address, bt_timeout)
+
+        # Models
+        self.controller = IrrigationController(self.mac_address)
+        self.stations: list[IrrigationStation] = []
+        for i in range(1, self.num_stations + 1):
+            duration = entry.data.get(
+                f"station_{i}_safety_duration", DEFAULT_SAFETY_DURATION
+            )
+            self.stations.append(IrrigationStation(i, duration))
+
+        # Irrigation tracking
+        self._irrigation_stop_event = asyncio.Event()
+        self._active_station: int | None = None
+        self._irrigation_task: asyncio.Task | None = None
+
+    async def _async_update_data(self) -> dict:
+        """No polling — state is managed optimistically."""
+        return {}
+
+    # -- Irrigation control --
+
+    async def start_irrigation(self, station_number: int) -> None:
+        """Send BLE start command and begin monitoring the irrigation."""
+        # If another station is running, signal it to stop tracking
+        if self._irrigation_task and not self._irrigation_task.done():
+            self._irrigation_stop_event.set()
+            # Give the old monitor task a moment to exit
+            await asyncio.sleep(0.1)
+
+        station = self.stations[station_number - 1]
+
+        try:
+            await self.api.sprinkle_station(station_number, station.safety_duration)
+        except APIConnectionError as ex:
+            _LOGGER.error("Failed to start station %d: %s", station_number, ex)
+            return
+
+        # Optimistic state: mark this station as sprinkling, others as stopped
+        for s in self.stations:
+            s.update_state("Stopped")
+        station.update_state("Sprinkling")
+        self._active_station = station_number
+        self._irrigation_stop_event = asyncio.Event()
+        self.async_set_updated_data({})
+
+        # Background task: wait for stop signal or safety timeout
+        self._irrigation_task = self.hass.async_create_task(
+            self._monitor_irrigation(station_number, station.safety_duration)
+        )
+
+    async def _monitor_irrigation(
+        self, station_number: int, duration_minutes: int
+    ) -> None:
+        """Wait for stop event or safety timeout, then mark station as stopped."""
+        try:
+            await asyncio.wait_for(
+                self._irrigation_stop_event.wait(),
+                timeout=duration_minutes * 60,
+            )
+        except asyncio.TimeoutError:
+            _LOGGER.info(
+                "Safety timeout reached for station %d (%d min)",
+                station_number,
+                duration_minutes,
+            )
+
+        # Only update if this station is still the active one
+        if self._active_station == station_number:
+            self.stations[station_number - 1].update_state("Stopped")
+            self._active_station = None
+            self.async_set_updated_data({})
+
+    async def stop_irrigation(self) -> None:
+        """Send BLE stop command. Updates state even on BLE failure (bug fix)."""
+        try:
+            await self.api.stop_manual_sprinkle()
+        except APIConnectionError as ex:
+            _LOGGER.error("Failed to stop irrigation: %s", ex)
+            # Notify the user — the device may still be irrigating
+            await self.hass.services.async_call(
+                "persistent_notification",
+                "create",
+                {
+                    "title": "Solem BT Controller",
+                    "message": (
+                        f"Failed to send stop command to {self.mac_address}. "
+                        f"The device may still be irrigating. Error: {ex}"
+                    ),
+                    "notification_id": f"solem_stop_failed_{self.mac_address}",
+                },
+            )
+
+        # Always update state, regardless of BLE success
+        self._irrigation_stop_event.set()
+        self._active_station = None
+        for station in self.stations:
+            station.update_state("Stopped")
+        self.async_set_updated_data({})
+
+    # -- Controller on/off --
+
+    async def turn_controller_on(self) -> None:
+        """Send BLE turn-on command."""
+        try:
+            await self.api.turn_on()
+        except APIConnectionError as ex:
+            _LOGGER.error("Failed to turn on controller: %s", ex)
+            return
+
+        self.controller.update_state("On")
+        self.async_set_updated_data({})
+
+    async def turn_controller_off(self) -> None:
+        """Send BLE turn-off command."""
+        try:
+            await self.api.turn_off_permanent()
+        except APIConnectionError as ex:
+            _LOGGER.error("Failed to turn off controller: %s", ex)
+            return
+
+        self.controller.update_state("Off")
+        self.async_set_updated_data({})

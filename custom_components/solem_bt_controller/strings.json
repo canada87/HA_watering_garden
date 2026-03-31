@@ -1,0 +1,51 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Solem BT Controller",
+        "data": {
+          "controller_mac_address": "Controller MAC Address",
+          "num_stations": "Number of Stations"
+        }
+      },
+      "safety_durations": {
+        "title": "Safety Durations",
+        "description": "Maximum irrigation time per station (minutes). The device stops automatically after this duration.",
+        "data": {
+          "station_1_safety_duration": "Station 1 (minutes)",
+          "station_2_safety_duration": "Station 2 (minutes)",
+          "station_3_safety_duration": "Station 3 (minutes)",
+          "station_4_safety_duration": "Station 4 (minutes)",
+          "station_5_safety_duration": "Station 5 (minutes)",
+          "station_6_safety_duration": "Station 6 (minutes)",
+          "station_7_safety_duration": "Station 7 (minutes)",
+          "station_8_safety_duration": "Station 8 (minutes)",
+          "station_9_safety_duration": "Station 9 (minutes)",
+          "station_10_safety_duration": "Station 10 (minutes)",
+          "station_11_safety_duration": "Station 11 (minutes)",
+          "station_12_safety_duration": "Station 12 (minutes)",
+          "station_13_safety_duration": "Station 13 (minutes)",
+          "station_14_safety_duration": "Station 14 (minutes)",
+          "station_15_safety_duration": "Station 15 (minutes)",
+          "station_16_safety_duration": "Station 16 (minutes)"
+        }
+      }
+    },
+    "error": {
+      "invalid_mac": "Invalid MAC address format (expected XX:XX:XX:XX:XX:XX)",
+      "cannot_connect": "Cannot connect to device. Check that the device is powered on and in Bluetooth range."
+    },
+    "abort": {
+      "already_configured": "This device is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "bluetooth_timeout": "Bluetooth Timeout (seconds)"
+        }
+      }
+    }
+  }
+}
