@@ -21,6 +21,9 @@ from .const import (
     MIN_SAFETY_DURATION,
 )
 
+# OptionsFlow no longer receives config_entry in __init__ (HA 2024.12+).
+# self.config_entry is set automatically by the framework.
+
 MAC_REGEX = re.compile(r"^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$")
 
 
@@ -100,14 +103,14 @@ class SolemConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @callback
     def async_get_options_flow(config_entry):
         """Return the options flow handler."""
-        return SolemOptionsFlow(config_entry)
+        return SolemOptionsFlow()
 
 
 class SolemOptionsFlow(config_entries.OptionsFlow):
-    """Handle options (bluetooth timeout + safety durations)."""
+    """Handle options (bluetooth timeout only).
 
-    def __init__(self, config_entry) -> None:
-        self.config_entry = config_entry
+    Irrigation durations are now managed via number entities on the dashboard.
+    """
 
     async def async_step_init(self, user_input=None):
         if user_input is not None:
@@ -116,7 +119,6 @@ class SolemOptionsFlow(config_entries.OptionsFlow):
         current_timeout = self.config_entry.options.get(
             CONF_BLUETOOTH_TIMEOUT, DEFAULT_BLUETOOTH_TIMEOUT
         )
-        num_stations = self.config_entry.data.get(CONF_NUM_STATIONS, 4)
 
         schema = {
             vol.Required(
@@ -126,20 +128,6 @@ class SolemOptionsFlow(config_entries.OptionsFlow):
                 vol.Range(min=MIN_BLUETOOTH_TIMEOUT, max=60),
             ),
         }
-
-        # Safety duration per station
-        for i in range(1, num_stations + 1):
-            key = f"station_{i}_safety_duration"
-            current_val = self.config_entry.options.get(
-                key,
-                self.config_entry.data.get(key, DEFAULT_SAFETY_DURATION),
-            )
-            schema[
-                vol.Required(key, default=current_val)
-            ] = vol.All(
-                int,
-                vol.Range(min=MIN_SAFETY_DURATION, max=MAX_SAFETY_DURATION),
-            )
 
         return self.async_show_form(
             step_id="init",

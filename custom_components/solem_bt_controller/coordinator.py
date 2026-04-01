@@ -52,6 +52,11 @@ class SolemCoordinator(DataUpdateCoordinator):
         """No polling — state is managed optimistically."""
         return {}
 
+    @property
+    def last_rssi(self) -> int | None:
+        """Return the last known RSSI value from BLE connection."""
+        return self.api.last_rssi
+
     def _apply_device_state(self, state: dict) -> None:
         """Update models from parsed BLE notification state."""
         battery = state.get("battery_level")

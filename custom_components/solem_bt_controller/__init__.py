@@ -6,7 +6,7 @@ from homeassistant.core import HomeAssistant
 from .const import DOMAIN
 from .coordinator import SolemCoordinator
 
-PLATFORMS = ["button", "sensor"]
+PLATFORMS = ["button", "number", "sensor"]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

@@ -6,7 +6,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import EntityCategory, PERCENTAGE
+from homeassistant.const import EntityCategory, PERCENTAGE, SIGNAL_STRENGTH_DECIBELS_MILLIWATT
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -74,6 +74,27 @@ class SolemBatterySensor(SolemBaseEntity, SensorEntity):
         return self.coordinator.controller.battery_level
 
 
+class SolemRssiSensor(SolemBaseEntity, SensorEntity):
+    """Shows the BLE signal strength (RSSI) of the device."""
+
+    _attr_device_class = SensorDeviceClass.SIGNAL_STRENGTH
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = SIGNAL_STRENGTH_DECIBELS_MILLIWATT
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:bluetooth-connect"
+
+    def __init__(self, coordinator: SolemCoordinator) -> None:
+        super().__init__(coordinator)
+        self._attr_name = "Signal Strength"
+        self._attr_unique_id = (
+            f"{DOMAIN}_{coordinator.mac_address}_rssi"
+        )
+
+    @property
+    def native_value(self) -> int | None:
+        return self.coordinator.last_rssi
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -89,5 +110,6 @@ async def async_setup_entry(
 
     entities.append(SolemControllerStateSensor(coordinator))
     entities.append(SolemBatterySensor(coordinator))
+    entities.append(SolemRssiSensor(coordinator))
 
     async_add_entities(entities)

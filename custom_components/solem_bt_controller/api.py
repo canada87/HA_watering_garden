@@ -80,6 +80,7 @@ class SolemBleApi:
         self.mac_address = mac_address
         self.bluetooth_timeout = bluetooth_timeout
         self._conn_lock = asyncio.Lock()
+        self.last_rssi: int | None = None
 
     async def _resolve_ble_device(self):
         """Find the BLE device by MAC address."""
@@ -89,6 +90,10 @@ class SolemBleApi:
         )
         if device:
             _LOGGER.debug("Device found via find_device_by_address: %s", device)
+            rssi = getattr(device, "rssi", None)
+            if rssi and rssi != 0:
+                self.last_rssi = rssi
+                _LOGGER.debug("RSSI: %d dB", rssi)
             return device
 
         # Fallback: full scan with manual match
@@ -97,6 +102,10 @@ class SolemBleApi:
         for d in devices:
             if d.address and d.address.upper() == self.mac_address.upper():
                 _LOGGER.debug("Device found via full scan: %s", d)
+                rssi = getattr(d, "rssi", None)
+                if rssi and rssi != 0:
+                    self.last_rssi = rssi
+                    _LOGGER.debug("RSSI: %d dB", rssi)
                 return d
 
         raise APIConnectionError(f"Device {self.mac_address} not found")
