@@ -17,6 +17,7 @@ from .const import CHARACTERISTIC_UUID, DEFAULT_BLUETOOTH_TIMEOUT, NOTIFY_UUID
 _LOGGER = logging.getLogger(__name__)
 
 COMMAND_COMMIT_DELAY = 0.3  # seconds between command and commit frame
+NOTIFY_WAIT_SECONDS = 3.0  # seconds to wait for notifications after a command
 
 
 class APIConnectionError(Exception):
@@ -196,6 +197,73 @@ class SolemBleApi:
                         )
                     result[service.uuid] = chars
                 return result
+            finally:
+                try:
+                    await client.disconnect()
+                except Exception:  # noqa: BLE001
+                    pass
+
+    async def _subscribe_send_and_collect(
+        self,
+        client: BleakClient,
+        command: bytes,
+        label: str,
+    ) -> list[dict]:
+        """Subscribe to notify, send command+commit, collect notifications."""
+        received: list[dict] = []
+
+        def _on_notification(sender, data: bytearray) -> None:
+            hex_data = data.hex()
+            _LOGGER.info(
+                "  [%s] NOTIFICATION: %s (%d bytes)", label, hex_data, len(data),
+            )
+            received.append({"data": hex_data, "raw": list(data)})
+
+        commit = struct.pack(">BB", 0x3B, 0x00)
+
+        await client.start_notify(NOTIFY_UUID, _on_notification)
+        _LOGGER.info("  [%s] Sending command: %s", label, command.hex())
+        await client.write_gatt_char(CHARACTERISTIC_UUID, command, response=True)
+        await asyncio.sleep(COMMAND_COMMIT_DELAY)
+        await client.write_gatt_char(CHARACTERISTIC_UUID, commit, response=True)
+        _LOGGER.info("  [%s] Waiting %.0fs for notifications...", label, NOTIFY_WAIT_SECONDS)
+        await asyncio.sleep(NOTIFY_WAIT_SECONDS)
+
+        try:
+            await client.stop_notify(NOTIFY_UUID)
+        except Exception:  # noqa: BLE001
+            pass
+
+        _LOGGER.info("  [%s] Received %d notification(s)", label, len(received))
+        return received
+
+    async def diagnose_irrigation_cycle(self) -> dict:
+        """Run start→capture→stop→capture cycle to map irrigation state bytes."""
+        start_cmd = struct.pack(">HBBBBH", 0x3105, 0x22, 1, 0x00, 1, 0xFFFF)
+        stop_cmd = struct.pack(">HBBBH", 0x3105, 0x24, 0x00, 0x00, 0xFFFF)
+
+        async with self._conn_lock:
+            client = await self._connect_client()
+            try:
+                _LOGGER.info("=== IRRIGATION CYCLE DIAGNOSTIC START ===")
+
+                # Phase 1: Start irrigation on station 1 for 1 minute
+                start_notifs = await self._subscribe_send_and_collect(
+                    client, start_cmd, "START station 1 (1 min)",
+                )
+
+                await asyncio.sleep(2.0)
+
+                # Phase 2: Stop irrigation
+                stop_notifs = await self._subscribe_send_and_collect(
+                    client, stop_cmd, "STOP irrigation",
+                )
+
+                _LOGGER.info("=== IRRIGATION CYCLE DIAGNOSTIC END ===")
+                return {
+                    "start_notifications": start_notifs,
+                    "stop_notifications": stop_notifs,
+                }
             finally:
                 try:
                     await client.disconnect()

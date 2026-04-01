@@ -156,6 +156,14 @@ class SolemCoordinator(DataUpdateCoordinator):
             _LOGGER.error("Diagnostic failed: %s", ex)
             return {"error": str(ex)}
 
+    async def diagnose_irrigation_cycle(self) -> dict:
+        """Run start→capture→stop→capture cycle to map state bytes."""
+        try:
+            return await self.api.diagnose_irrigation_cycle()
+        except APIConnectionError as ex:
+            _LOGGER.error("Irrigation cycle diagnostic failed: %s", ex)
+            return {"error": str(ex)}
+
     async def turn_controller_off(self) -> None:
         """Send BLE turn-off command."""
         try:
