@@ -105,9 +105,13 @@ class SolemCoordinator(DataUpdateCoordinator):
             self.async_set_updated_data({})
 
     async def stop_irrigation(self) -> None:
-        """Send BLE stop command. Updates state even on BLE failure (bug fix)."""
+        """Send BLE stop command with repeated writes for reliability.
+
+        Uses repeated writes within a single connection (3x) to improve
+        reliability on weak BLE signal. Updates state even on BLE failure.
+        """
         try:
-            await self.api.stop_manual_sprinkle()
+            await self.api.stop_manual_sprinkle_repeated(attempts=3)
         except APIConnectionError as ex:
             _LOGGER.error("Failed to stop irrigation: %s", ex)
             # Notify the user — the device may still be irrigating
@@ -143,6 +147,14 @@ class SolemCoordinator(DataUpdateCoordinator):
 
         self.controller.update_state("On")
         self.async_set_updated_data({})
+
+    async def diagnose_device(self) -> dict:
+        """Run full GATT diagnostic and return results."""
+        try:
+            return await self.api.diagnose_device()
+        except APIConnectionError as ex:
+            _LOGGER.error("Diagnostic failed: %s", ex)
+            return {"error": str(ex)}
 
     async def turn_controller_off(self) -> None:
         """Send BLE turn-off command."""

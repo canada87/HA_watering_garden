@@ -152,6 +152,36 @@ class SolemBleApi:
         _LOGGER.debug("Turn off controller permanently — payload: %s", command.hex())
         await self._write_and_commit(command)
 
+    async def stop_manual_sprinkle_repeated(self, attempts: int = 3) -> None:
+        """Send stop command multiple times within a single connection for reliability."""
+        command = struct.pack(">HBBBH", 0x3105, 0x24, 0x00, 0x00, 0xFFFF)
+        commit = struct.pack(">BB", 0x3B, 0x00)
+        _LOGGER.debug(
+            "Stop manual sprinkle (repeated %dx) — payload: %s",
+            attempts, command.hex(),
+        )
+        async with self._conn_lock:
+            client = await self._connect_client()
+            try:
+                for attempt in range(1, attempts + 1):
+                    _LOGGER.debug("Stop attempt %d/%d", attempt, attempts)
+                    await self._write_with_retry(client, command)
+                    await asyncio.sleep(COMMAND_COMMIT_DELAY)
+                    await self._write_with_retry(client, commit)
+                    if attempt < attempts:
+                        await asyncio.sleep(1.0)
+                _LOGGER.debug("Stop command sent %d times successfully", attempts)
+            except Exception as ex:
+                _LOGGER.error(
+                    "Stop repeated write failed on attempt: %s", ex,
+                )
+                raise
+            finally:
+                try:
+                    await client.disconnect()
+                except Exception:  # noqa: BLE001
+                    pass
+
     async def list_characteristics(self) -> dict:
         """List all GATT services and characteristics (for debugging)."""
         async with self._conn_lock:
@@ -166,6 +196,94 @@ class SolemBleApi:
                         )
                     result[service.uuid] = chars
                 return result
+            finally:
+                try:
+                    await client.disconnect()
+                except Exception:  # noqa: BLE001
+                    pass
+
+    async def diagnose_device(self) -> dict:
+        """Full GATT diagnostic: discover characteristics, read values, listen for notifications."""
+        async with self._conn_lock:
+            client = await self._connect_client()
+            try:
+                result = {}
+                _LOGGER.info("=== SOLEM DEVICE DIAGNOSTIC START ===")
+                _LOGGER.info("Device: %s, MTU: %s", self.mac_address, client.mtu_size)
+
+                # Discover all services and characteristics
+                for service in client.services:
+                    _LOGGER.info("Service: %s", service.uuid)
+                    service_chars = []
+                    for char in service.characteristics:
+                        _LOGGER.info(
+                            "  Char: %s  Properties: %s", char.uuid, char.properties,
+                        )
+                        char_info = {
+                            "uuid": char.uuid,
+                            "properties": char.properties,
+                        }
+
+                        # Try reading characteristics that support it
+                        if "read" in char.properties:
+                            try:
+                                data = await client.read_gatt_char(char.uuid)
+                                hex_data = data.hex()
+                                _LOGGER.info(
+                                    "    READ -> %s (%d bytes)", hex_data, len(data),
+                                )
+                                char_info["read_value"] = hex_data
+                            except Exception as ex:
+                                _LOGGER.warning("    READ FAILED: %s", ex)
+                                char_info["read_error"] = str(ex)
+
+                        service_chars.append(char_info)
+                    result[service.uuid] = service_chars
+
+                # Subscribe to notification/indicate characteristics
+                notify_uuids = []
+                for service in client.services:
+                    for char in service.characteristics:
+                        if "notify" in char.properties or "indicate" in char.properties:
+                            notify_uuids.append(char.uuid)
+
+                notifications_received: list[dict] = []
+
+                if notify_uuids:
+
+                    def _on_notification(sender, data: bytearray) -> None:
+                        hex_data = data.hex()
+                        _LOGGER.info(
+                            "  NOTIFICATION from %s: %s (%d bytes)",
+                            sender, hex_data, len(data),
+                        )
+                        notifications_received.append(
+                            {"sender": str(sender), "data": hex_data}
+                        )
+
+                    for uuid in notify_uuids:
+                        try:
+                            await client.start_notify(uuid, _on_notification)
+                            _LOGGER.info("  Subscribed to notifications: %s", uuid)
+                        except Exception as ex:
+                            _LOGGER.warning("  Subscribe to %s FAILED: %s", uuid, ex)
+
+                    _LOGGER.info("  Waiting 5 seconds for notifications...")
+                    await asyncio.sleep(5.0)
+
+                    for uuid in notify_uuids:
+                        try:
+                            await client.stop_notify(uuid)
+                        except Exception:  # noqa: BLE001
+                            pass
+
+                result["_notifications"] = notifications_received
+                _LOGGER.info(
+                    "  Received %d notification(s)", len(notifications_received),
+                )
+                _LOGGER.info("=== SOLEM DEVICE DIAGNOSTIC END ===")
+                return result
+
             finally:
                 try:
                     await client.disconnect()

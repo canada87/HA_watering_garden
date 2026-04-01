@@ -2,6 +2,7 @@
 
 from homeassistant.components.button import ButtonEntity
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -69,6 +70,21 @@ class SolemControllerOffButton(SolemBaseEntity, ButtonEntity):
         await self.coordinator.turn_controller_off()
 
 
+class SolemDiagnoseButton(SolemBaseEntity, ButtonEntity):
+    """Button to run full GATT diagnostic — results are logged."""
+
+    _attr_icon = "mdi:stethoscope"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator: SolemCoordinator) -> None:
+        super().__init__(coordinator)
+        self._attr_name = "Diagnose Device"
+        self._attr_unique_id = f"{DOMAIN}_{coordinator.mac_address}_diagnose"
+
+    async def async_press(self) -> None:
+        await self.coordinator.diagnose_device()
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -85,5 +101,6 @@ async def async_setup_entry(
     entities.append(SolemStopButton(coordinator))
     entities.append(SolemControllerOnButton(coordinator))
     entities.append(SolemControllerOffButton(coordinator))
+    entities.append(SolemDiagnoseButton(coordinator))
 
     async_add_entities(entities)
