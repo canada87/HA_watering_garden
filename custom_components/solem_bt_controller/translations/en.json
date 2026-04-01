@@ -42,8 +42,25 @@
   "options": {
     "step": {
       "init": {
+        "description": "Bluetooth settings and irrigation duration per station (minutes).",
         "data": {
-          "bluetooth_timeout": "Bluetooth Timeout (seconds)"
+          "bluetooth_timeout": "Bluetooth Timeout (seconds)",
+          "station_1_safety_duration": "Station 1 (minutes)",
+          "station_2_safety_duration": "Station 2 (minutes)",
+          "station_3_safety_duration": "Station 3 (minutes)",
+          "station_4_safety_duration": "Station 4 (minutes)",
+          "station_5_safety_duration": "Station 5 (minutes)",
+          "station_6_safety_duration": "Station 6 (minutes)",
+          "station_7_safety_duration": "Station 7 (minutes)",
+          "station_8_safety_duration": "Station 8 (minutes)",
+          "station_9_safety_duration": "Station 9 (minutes)",
+          "station_10_safety_duration": "Station 10 (minutes)",
+          "station_11_safety_duration": "Station 11 (minutes)",
+          "station_12_safety_duration": "Station 12 (minutes)",
+          "station_13_safety_duration": "Station 13 (minutes)",
+          "station_14_safety_duration": "Station 14 (minutes)",
+          "station_15_safety_duration": "Station 15 (minutes)",
+          "station_16_safety_duration": "Station 16 (minutes)"
         }
       }
     }

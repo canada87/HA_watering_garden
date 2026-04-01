@@ -104,7 +104,7 @@ class SolemConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class SolemOptionsFlow(config_entries.OptionsFlow):
-    """Handle options (bluetooth timeout)."""
+    """Handle options (bluetooth timeout + safety durations)."""
 
     def __init__(self, config_entry) -> None:
         self.config_entry = config_entry
@@ -116,17 +116,32 @@ class SolemOptionsFlow(config_entries.OptionsFlow):
         current_timeout = self.config_entry.options.get(
             CONF_BLUETOOTH_TIMEOUT, DEFAULT_BLUETOOTH_TIMEOUT
         )
+        num_stations = self.config_entry.data.get(CONF_NUM_STATIONS, 4)
+
+        schema = {
+            vol.Required(
+                CONF_BLUETOOTH_TIMEOUT, default=current_timeout
+            ): vol.All(
+                int,
+                vol.Range(min=MIN_BLUETOOTH_TIMEOUT, max=60),
+            ),
+        }
+
+        # Safety duration per station
+        for i in range(1, num_stations + 1):
+            key = f"station_{i}_safety_duration"
+            current_val = self.config_entry.options.get(
+                key,
+                self.config_entry.data.get(key, DEFAULT_SAFETY_DURATION),
+            )
+            schema[
+                vol.Required(key, default=current_val)
+            ] = vol.All(
+                int,
+                vol.Range(min=MIN_SAFETY_DURATION, max=MAX_SAFETY_DURATION),
+            )
 
         return self.async_show_form(
             step_id="init",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(
-                        CONF_BLUETOOTH_TIMEOUT, default=current_timeout
-                    ): vol.All(
-                        int,
-                        vol.Range(min=MIN_BLUETOOTH_TIMEOUT, max=60),
-                    ),
-                }
-            ),
+            data_schema=vol.Schema(schema),
         )

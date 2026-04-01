@@ -34,10 +34,13 @@ def parse_state(raw_packets: list[bytearray]) -> dict:
 
     Main fragment (byte 2 = 0x02) layout:
     - Byte 10: battery level (0-100 percentage)
-    - Bytes 13-14: irrigation-related status (FF FF = idle)
+    - Byte 13: active station — 0xFF = idle, 0xFN = station N active
+    - Byte 14: countdown timer in seconds (0xFF = idle)
     """
     state: dict = {
         "battery_level": None,
+        "active_station": None,
+        "is_irrigating": False,
         "raw_packets": [p.hex() for p in raw_packets],
     }
 
@@ -46,10 +49,19 @@ def parse_state(raw_packets: list[bytearray]) -> dict:
         for packet in raw_packets:
             if len(packet) >= 15 and packet[0] == marker and packet[2] == 0x02:
                 state["battery_level"] = packet[10]
+
+                station_byte = packet[13]
+                countdown = packet[14]
+
+                if station_byte != 0xFF and countdown != 0xFF and countdown > 0:
+                    state["active_station"] = station_byte & 0x0F
+                    state["is_irrigating"] = True
+
                 _LOGGER.debug(
-                    "Parsed state: battery=%d%%, status_bytes=%s",
-                    packet[10],
-                    packet[11:16].hex(),
+                    "Parsed state: battery=%d%%, station_byte=0x%02X, "
+                    "countdown=%d, is_irrigating=%s, active_station=%s",
+                    packet[10], station_byte, countdown,
+                    state["is_irrigating"], state["active_station"],
                 )
                 return state
 

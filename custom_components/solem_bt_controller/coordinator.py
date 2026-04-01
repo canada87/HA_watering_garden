@@ -37,8 +37,9 @@ class SolemCoordinator(DataUpdateCoordinator):
         self.controller = IrrigationController(self.mac_address)
         self.stations: list[IrrigationStation] = []
         for i in range(1, self.num_stations + 1):
-            duration = entry.data.get(
-                f"station_{i}_safety_duration", DEFAULT_SAFETY_DURATION
+            key = f"station_{i}_safety_duration"
+            duration = entry.options.get(
+                key, entry.data.get(key, DEFAULT_SAFETY_DURATION)
             )
             self.stations.append(IrrigationStation(i, duration))
 
@@ -57,6 +58,25 @@ class SolemCoordinator(DataUpdateCoordinator):
         if battery is not None:
             self.controller.update_battery(battery)
             _LOGGER.debug("Battery level updated: %d%%", battery)
+
+        # Update irrigation state from device response
+        is_irrigating = state.get("is_irrigating", False)
+        active_station = state.get("active_station")
+
+        if is_irrigating and active_station is not None:
+            _LOGGER.debug(
+                "Device reports irrigation active on station %d", active_station,
+            )
+            for s in self.stations:
+                if s.station_number == active_station:
+                    s.update_state("Sprinkling")
+                else:
+                    s.update_state("Stopped")
+        elif not is_irrigating and active_station is None:
+            _LOGGER.debug("Device reports no active irrigation")
+            for s in self.stations:
+                s.update_state("Stopped")
+            self._active_station = None
 
     # -- Irrigation control --
 
@@ -79,10 +99,13 @@ class SolemCoordinator(DataUpdateCoordinator):
             _LOGGER.error("Failed to start station %d: %s", station_number, ex)
             return
 
-        # Optimistic state: mark this station as sprinkling, others as stopped
-        for s in self.stations:
-            s.update_state("Stopped")
-        station.update_state("Sprinkling")
+        # If device state didn't set irrigation (e.g. no notifications received),
+        # fall back to optimistic state
+        if station.state != "Sprinkling":
+            for s in self.stations:
+                s.update_state("Stopped")
+            station.update_state("Sprinkling")
+
         self._active_station = station_number
         self._irrigation_stop_event = asyncio.Event()
         self.async_set_updated_data({})
@@ -139,11 +162,15 @@ class SolemCoordinator(DataUpdateCoordinator):
                 },
             )
 
-        # Always update state, regardless of BLE success
+        # Signal the monitor task to stop
         self._irrigation_stop_event.set()
+
+        # If device state didn't clear irrigation (e.g. no notifications received),
+        # fall back to optimistic state
+        if any(s.state == "Sprinkling" for s in self.stations):
+            for station in self.stations:
+                station.update_state("Stopped")
         self._active_station = None
-        for station in self.stations:
-            station.update_state("Stopped")
         self.async_set_updated_data({})
 
     # -- Controller on/off --
