@@ -12,7 +12,7 @@ from bleak_retry_connector import (
 )
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from .const import CHARACTERISTIC_UUID, DEFAULT_BLUETOOTH_TIMEOUT
+from .const import CHARACTERISTIC_UUID, DEFAULT_BLUETOOTH_TIMEOUT, NOTIFY_UUID
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -203,7 +203,12 @@ class SolemBleApi:
                     pass
 
     async def diagnose_device(self) -> dict:
-        """Full GATT diagnostic: discover characteristics, read values, listen for notifications."""
+        """Full GATT diagnostic: discover characteristics, read values, subscribe to 108b0003.
+
+        Subscribes ONLY to the Solem custom notify characteristic (108b0003)
+        to avoid the authorization error on 0x2A05 that drops the connection.
+        After subscribing, sends a turn-on command to trigger a response.
+        """
         async with self._conn_lock:
             client = await self._connect_client()
             try:
@@ -240,42 +245,47 @@ class SolemBleApi:
                         service_chars.append(char_info)
                     result[service.uuid] = service_chars
 
-                # Subscribe to notification/indicate characteristics
-                notify_uuids = []
-                for service in client.services:
-                    for char in service.characteristics:
-                        if "notify" in char.properties or "indicate" in char.properties:
-                            notify_uuids.append(char.uuid)
-
+                # Subscribe ONLY to Solem custom notify characteristic
                 notifications_received: list[dict] = []
 
-                if notify_uuids:
+                def _on_notification(sender, data: bytearray) -> None:
+                    hex_data = data.hex()
+                    _LOGGER.info(
+                        "  NOTIFICATION from %s: %s (%d bytes)",
+                        sender, hex_data, len(data),
+                    )
+                    notifications_received.append(
+                        {"sender": str(sender), "data": hex_data}
+                    )
 
-                    def _on_notification(sender, data: bytearray) -> None:
-                        hex_data = data.hex()
-                        _LOGGER.info(
-                            "  NOTIFICATION from %s: %s (%d bytes)",
-                            sender, hex_data, len(data),
-                        )
-                        notifications_received.append(
-                            {"sender": str(sender), "data": hex_data}
-                        )
+                try:
+                    await client.start_notify(NOTIFY_UUID, _on_notification)
+                    _LOGGER.info("  Subscribed to Solem notify: %s", NOTIFY_UUID)
+                except Exception as ex:
+                    _LOGGER.error("  Subscribe to %s FAILED: %s", NOTIFY_UUID, ex)
+                    result["_notifications"] = []
+                    result["_notify_error"] = str(ex)
+                    _LOGGER.info("=== SOLEM DEVICE DIAGNOSTIC END (no notify) ===")
+                    return result
 
-                    for uuid in notify_uuids:
-                        try:
-                            await client.start_notify(uuid, _on_notification)
-                            _LOGGER.info("  Subscribed to notifications: %s", uuid)
-                        except Exception as ex:
-                            _LOGGER.warning("  Subscribe to %s FAILED: %s", uuid, ex)
+                # Send turn-on command to provoke a response
+                turn_on_cmd = struct.pack(">HBBBH", 0x3105, 0x12, 0xFF, 0x00, 0xFFFF)
+                commit = struct.pack(">BB", 0x3B, 0x00)
+                _LOGGER.info("  Sending turn-on command to trigger response...")
+                await client.write_gatt_char(
+                    CHARACTERISTIC_UUID, turn_on_cmd, response=True,
+                )
+                await asyncio.sleep(COMMAND_COMMIT_DELAY)
+                await client.write_gatt_char(
+                    CHARACTERISTIC_UUID, commit, response=True,
+                )
+                _LOGGER.info("  Command sent, waiting 5 seconds for notifications...")
+                await asyncio.sleep(5.0)
 
-                    _LOGGER.info("  Waiting 5 seconds for notifications...")
-                    await asyncio.sleep(5.0)
-
-                    for uuid in notify_uuids:
-                        try:
-                            await client.stop_notify(uuid)
-                        except Exception:  # noqa: BLE001
-                            pass
+                try:
+                    await client.stop_notify(NOTIFY_UUID)
+                except Exception:  # noqa: BLE001
+                    pass
 
                 result["_notifications"] = notifications_received
                 _LOGGER.info(

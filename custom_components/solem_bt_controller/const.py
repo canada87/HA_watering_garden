@@ -2,7 +2,8 @@
 
 DOMAIN = "solem_bt_controller"
 
-CHARACTERISTIC_UUID = "108b0002-eab5-bc09-d0ea-0b8f467ce8ee"
+CHARACTERISTIC_UUID = "108b0002-eab5-bc09-d0ea-0b8f467ce8ee"  # write
+NOTIFY_UUID = "108b0003-eab5-bc09-d0ea-0b8f467ce8ee"  # notify (device responses)
 
 DEFAULT_BLUETOOTH_TIMEOUT = 15  # seconds
 MIN_BLUETOOTH_TIMEOUT = 5
