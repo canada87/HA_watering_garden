@@ -51,6 +51,13 @@ class SolemCoordinator(DataUpdateCoordinator):
         """No polling — state is managed optimistically."""
         return {}
 
+    def _apply_device_state(self, state: dict) -> None:
+        """Update models from parsed BLE notification state."""
+        battery = state.get("battery_level")
+        if battery is not None:
+            self.controller.update_battery(battery)
+            _LOGGER.debug("Battery level updated: %d%%", battery)
+
     # -- Irrigation control --
 
     async def start_irrigation(self, station_number: int) -> None:
@@ -64,7 +71,10 @@ class SolemCoordinator(DataUpdateCoordinator):
         station = self.stations[station_number - 1]
 
         try:
-            await self.api.sprinkle_station(station_number, station.safety_duration)
+            state = await self.api.sprinkle_station(
+                station_number, station.safety_duration,
+            )
+            self._apply_device_state(state)
         except APIConnectionError as ex:
             _LOGGER.error("Failed to start station %d: %s", station_number, ex)
             return
@@ -111,7 +121,8 @@ class SolemCoordinator(DataUpdateCoordinator):
         reliability on weak BLE signal. Updates state even on BLE failure.
         """
         try:
-            await self.api.stop_manual_sprinkle_repeated(attempts=3)
+            state = await self.api.stop_manual_sprinkle_repeated(attempts=3)
+            self._apply_device_state(state)
         except APIConnectionError as ex:
             _LOGGER.error("Failed to stop irrigation: %s", ex)
             # Notify the user — the device may still be irrigating
@@ -140,7 +151,8 @@ class SolemCoordinator(DataUpdateCoordinator):
     async def turn_controller_on(self) -> None:
         """Send BLE turn-on command."""
         try:
-            await self.api.turn_on()
+            state = await self.api.turn_on()
+            self._apply_device_state(state)
         except APIConnectionError as ex:
             _LOGGER.error("Failed to turn on controller: %s", ex)
             return
@@ -148,29 +160,28 @@ class SolemCoordinator(DataUpdateCoordinator):
         self.controller.update_state("On")
         self.async_set_updated_data({})
 
-    async def diagnose_device(self) -> dict:
-        """Run full GATT diagnostic and return results."""
-        try:
-            return await self.api.diagnose_device()
-        except APIConnectionError as ex:
-            _LOGGER.error("Diagnostic failed: %s", ex)
-            return {"error": str(ex)}
-
-    async def diagnose_irrigation_cycle(self) -> dict:
-        """Run start→capture→stop→capture cycle to map state bytes."""
-        try:
-            return await self.api.diagnose_irrigation_cycle()
-        except APIConnectionError as ex:
-            _LOGGER.error("Irrigation cycle diagnostic failed: %s", ex)
-            return {"error": str(ex)}
-
     async def turn_controller_off(self) -> None:
         """Send BLE turn-off command."""
         try:
-            await self.api.turn_off_permanent()
+            state = await self.api.turn_off_permanent()
+            self._apply_device_state(state)
         except APIConnectionError as ex:
             _LOGGER.error("Failed to turn off controller: %s", ex)
             return
 
         self.controller.update_state("Off")
+        self.async_set_updated_data({})
+
+    # -- State refresh --
+
+    async def refresh_state(self) -> None:
+        """Read device state by sending a turn-on command (safe if already on)."""
+        try:
+            state = await self.api.read_state()
+            self._apply_device_state(state)
+        except APIConnectionError as ex:
+            _LOGGER.error("Failed to refresh state: %s", ex)
+            return
+
+        self.controller.update_state("On")
         self.async_set_updated_data({})

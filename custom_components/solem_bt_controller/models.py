@@ -7,9 +7,14 @@ class IrrigationController:
     def __init__(self, mac_address: str) -> None:
         self.mac_address = mac_address
         self.state: str = "On"
+        self.battery_level: int | None = None
 
     def update_state(self, new_state: str) -> None:
         self.state = new_state
+
+    def update_battery(self, level: int | None) -> None:
+        if level is not None:
+            self.battery_level = level
 
 
 class IrrigationStation:

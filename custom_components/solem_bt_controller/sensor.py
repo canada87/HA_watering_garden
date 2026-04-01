@@ -1,7 +1,12 @@
 """Sensor entities for the Solem BT Controller integration."""
 
-from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorStateClass,
+)
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory, PERCENTAGE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -49,6 +54,26 @@ class SolemControllerStateSensor(SolemBaseEntity, SensorEntity):
         return self.coordinator.controller.state
 
 
+class SolemBatterySensor(SolemBaseEntity, SensorEntity):
+    """Shows the battery level read from the device via BLE notifications."""
+
+    _attr_device_class = SensorDeviceClass.BATTERY
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, coordinator: SolemCoordinator) -> None:
+        super().__init__(coordinator)
+        self._attr_name = "Battery"
+        self._attr_unique_id = (
+            f"{DOMAIN}_{coordinator.mac_address}_battery"
+        )
+
+    @property
+    def native_value(self) -> int | None:
+        return self.coordinator.controller.battery_level
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -63,5 +88,6 @@ async def async_setup_entry(
         entities.append(SolemStationStateSensor(coordinator, i))
 
     entities.append(SolemControllerStateSensor(coordinator))
+    entities.append(SolemBatterySensor(coordinator))
 
     async_add_entities(entities)

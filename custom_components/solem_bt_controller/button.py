@@ -70,34 +70,19 @@ class SolemControllerOffButton(SolemBaseEntity, ButtonEntity):
         await self.coordinator.turn_controller_off()
 
 
-class SolemDiagnoseButton(SolemBaseEntity, ButtonEntity):
-    """Button to run full GATT diagnostic — results are logged."""
+class SolemRefreshStateButton(SolemBaseEntity, ButtonEntity):
+    """Button to read current device state (battery, etc.) from the controller."""
 
-    _attr_icon = "mdi:stethoscope"
+    _attr_icon = "mdi:refresh"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(self, coordinator: SolemCoordinator) -> None:
         super().__init__(coordinator)
-        self._attr_name = "Diagnose Device"
-        self._attr_unique_id = f"{DOMAIN}_{coordinator.mac_address}_diagnose"
+        self._attr_name = "Refresh State"
+        self._attr_unique_id = f"{DOMAIN}_{coordinator.mac_address}_refresh"
 
     async def async_press(self) -> None:
-        await self.coordinator.diagnose_device()
-
-
-class SolemDiagnoseIrrigationButton(SolemBaseEntity, ButtonEntity):
-    """Run start→stop cycle to capture state change notifications."""
-
-    _attr_icon = "mdi:test-tube"
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-
-    def __init__(self, coordinator: SolemCoordinator) -> None:
-        super().__init__(coordinator)
-        self._attr_name = "Diagnose Irrigation Cycle"
-        self._attr_unique_id = f"{DOMAIN}_{coordinator.mac_address}_diagnose_cycle"
-
-    async def async_press(self) -> None:
-        await self.coordinator.diagnose_irrigation_cycle()
+        await self.coordinator.refresh_state()
 
 
 async def async_setup_entry(
@@ -116,7 +101,6 @@ async def async_setup_entry(
     entities.append(SolemStopButton(coordinator))
     entities.append(SolemControllerOnButton(coordinator))
     entities.append(SolemControllerOffButton(coordinator))
-    entities.append(SolemDiagnoseButton(coordinator))
-    entities.append(SolemDiagnoseIrrigationButton(coordinator))
+    entities.append(SolemRefreshStateButton(coordinator))
 
     async_add_entities(entities)
