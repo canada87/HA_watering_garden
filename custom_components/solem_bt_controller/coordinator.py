@@ -3,6 +3,7 @@
 import asyncio
 import logging
 
+from homeassistant.components.bluetooth import async_last_service_info
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
@@ -47,6 +48,7 @@ class SolemCoordinator(DataUpdateCoordinator):
         self._irrigation_stop_event = asyncio.Event()
         self._active_station: int | None = None
         self._irrigation_task: asyncio.Task | None = None
+        self._last_rssi: int | None = None
 
     async def _async_update_data(self) -> dict:
         """No polling — state is managed optimistically."""
@@ -54,11 +56,24 @@ class SolemCoordinator(DataUpdateCoordinator):
 
     @property
     def last_rssi(self) -> int | None:
-        """Return the last known RSSI value from BLE connection."""
-        return self.api.last_rssi
+        """Return the last known RSSI value from HA bluetooth service info."""
+        return self._last_rssi
+
+    def _update_rssi(self) -> None:
+        """Read RSSI from HA bluetooth integration (works with ESPHome proxy)."""
+        try:
+            service_info = async_last_service_info(
+                self.hass, self.mac_address, connectable=True
+            )
+            if service_info is not None and service_info.rssi != 0:
+                self._last_rssi = service_info.rssi
+                _LOGGER.debug("RSSI updated: %d dBm", self._last_rssi)
+        except Exception as ex:  # noqa: BLE001
+            _LOGGER.debug("Could not read RSSI: %s", ex)
 
     def _apply_device_state(self, state: dict) -> None:
         """Update models from parsed BLE notification state."""
+        self._update_rssi()
         battery = state.get("battery_level")
         if battery is not None:
             self.controller.update_battery(battery)
