@@ -142,7 +142,7 @@ class SolemBleApi:
         wait=wait_exponential(multiplier=0.4, min=0.4, max=2),
     )
     async def _write_with_retry(
-        self, client: BleakClient, payload: bytes, response: bool = True,
+        self, client: BleakClient, payload: bytes, response: bool = False,
     ) -> None:
         """Write a GATT characteristic with tenacity retry."""
         _LOGGER.debug(
