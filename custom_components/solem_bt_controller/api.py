@@ -53,15 +53,20 @@ def parse_state(raw_packets: list[bytearray]) -> dict:
                 station_byte = packet[13]
                 countdown = packet[14]
 
-                if station_byte != 0xFF and countdown != 0xFF and countdown > 0:
-                    state["active_station"] = station_byte & 0x0F
+                # countdown != 0xFF means a timed session is active.
+                # station_byte stays 0xFF even during irrigation (device quirk),
+                # so we use countdown alone to detect active irrigation.
+                if countdown != 0xFF and countdown > 0:
                     state["is_irrigating"] = True
+                    if station_byte != 0xFF:
+                        state["active_station"] = station_byte & 0x0F
 
                 _LOGGER.debug(
                     "Parsed state: battery=%d%%, station_byte=0x%02X, "
-                    "countdown=%d, is_irrigating=%s, active_station=%s",
+                    "countdown=%d, is_irrigating=%s, active_station=%s | raw: %s",
                     packet[10], station_byte, countdown,
                     state["is_irrigating"], state["active_station"],
+                    packet.hex(),
                 )
                 return state
 

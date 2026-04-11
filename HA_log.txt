@@ -1,0 +1,132 @@
+2026-04-11 14:11:39.513 WARNING (SyncWorker_2) [homeassistant.loader] We found a custom integration solem_bt_controller which has not been tested by Home Assistant. This component might cause stability problems, be sure to disable it if you experience issues with Home Assistant
+2026-04-11 14:13:09.636 WARNING (SyncWorker_0) [homeassistant.loader] We found a custom integration solem_bt_controller which has not been tested by Home Assistant. This component might cause stability problems, be sure to disable it if you experience issues with Home Assistant
+2026-04-11 14:13:12.501 DEBUG (MainThread) [custom_components.solem_bt_controller.coordinator] Finished fetching solem_bt_controller data in 0.000 seconds (success: True)
+2026-04-11 14:14:10.835 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Reading device state via turn-on command
+2026-04-11 14:14:10.835 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Turn on controller — payload: 310512ff00ffff
+2026-04-11 14:14:10.835 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Resolving BLE device C8:B9:61:F0:15:30 ...
+2026-04-11 14:14:10.835 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Device found via find_device_by_address: C8:B9:61:F0:15:30: quarnaro 14 / 2N
+2026-04-11 14:14:10.836 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Establishing connection to C8:B9:61:F0:15:30: quarnaro 14 / 2N ...
+2026-04-11 14:14:12.136 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Connected. MTU size: 23
+2026-04-11 14:14:12.739 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Writing 7 bytes to 108b0002-eab5-bc09-d0ea-0b8f467ce8ee (response=False): 310512ff00ffff
+2026-04-11 14:14:12.740 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Write OK
+2026-04-11 14:14:13.042 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Writing 2 bytes to 108b0002-eab5-bc09-d0ea-0b8f467ce8ee (response=False): 3b00
+2026-04-11 14:14:13.042 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Write OK
+2026-04-11 14:14:13.042 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Command + commit sent successfully
+2026-04-11 14:14:15.123 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Received 6 notification packets
+2026-04-11 14:14:15.123 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Parsed state: battery=81%, station_byte=0xFF, countdown=255, is_irrigating=False, active_station=None
+2026-04-11 14:14:15.123 DEBUG (MainThread) [custom_components.solem_bt_controller.coordinator] RSSI updated: -92 dBm
+2026-04-11 14:14:15.123 DEBUG (MainThread) [custom_components.solem_bt_controller.coordinator] Battery level updated: 81%
+2026-04-11 14:14:15.123 DEBUG (MainThread) [custom_components.solem_bt_controller.coordinator] Device reports no active irrigation
+2026-04-11 14:14:15.123 DEBUG (MainThread) [custom_components.solem_bt_controller.coordinator] Manually updated solem_bt_controller data
+2026-04-11 14:14:33.833 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Sprinkle station 1 for 10 min — payload: 31052201000affff
+2026-04-11 14:14:33.833 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Resolving BLE device C8:B9:61:F0:15:30 ...
+2026-04-11 14:14:33.833 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Device found via find_device_by_address: C8:B9:61:F0:15:30: quarnaro 14 / 2N
+2026-04-11 14:14:33.833 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Establishing connection to C8:B9:61:F0:15:30: quarnaro 14 / 2N ...
+2026-04-11 14:14:35.383 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Connected. MTU size: 23
+2026-04-11 14:14:37.844 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Writing 8 bytes to 108b0002-eab5-bc09-d0ea-0b8f467ce8ee (response=False): 31052201000affff
+2026-04-11 14:14:37.844 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Write OK
+2026-04-11 14:14:38.145 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Writing 2 bytes to 108b0002-eab5-bc09-d0ea-0b8f467ce8ee (response=False): 3b00
+2026-04-11 14:14:38.145 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Write OK
+2026-04-11 14:14:38.146 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Command + commit sent successfully
+2026-04-11 14:14:40.198 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Received 6 notification packets
+2026-04-11 14:14:40.198 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Parsed state: battery=81%, station_byte=0xFF, countdown=230, is_irrigating=False, active_station=None
+2026-04-11 14:14:40.199 DEBUG (MainThread) [custom_components.solem_bt_controller.coordinator] RSSI updated: -89 dBm
+2026-04-11 14:14:40.199 DEBUG (MainThread) [custom_components.solem_bt_controller.coordinator] Battery level updated: 81%
+2026-04-11 14:14:40.199 DEBUG (MainThread) [custom_components.solem_bt_controller.coordinator] Device reports no active irrigation
+2026-04-11 14:14:40.199 DEBUG (MainThread) [custom_components.solem_bt_controller.coordinator] Manually updated solem_bt_controller data
+2026-04-11 14:15:08.209 DEBUG (MainThread) [custom_components.solem_bt_controller.coordinator] Manually updated solem_bt_controller data
+2026-04-11 14:15:08.310 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Sprinkle station 1 for 10 min — payload: 31052201000affff
+2026-04-11 14:15:08.310 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Resolving BLE device C8:B9:61:F0:15:30 ...
+2026-04-11 14:15:08.310 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Device found via find_device_by_address: C8:B9:61:F0:15:30: quarnaro 14 / 2N
+2026-04-11 14:15:08.310 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Establishing connection to C8:B9:61:F0:15:30: quarnaro 14 / 2N ...
+2026-04-11 14:15:08.544 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Connected. MTU size: 23
+2026-04-11 14:15:12.785 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Writing 8 bytes to 108b0002-eab5-bc09-d0ea-0b8f467ce8ee (response=False): 31052201000affff
+2026-04-11 14:15:12.785 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Write OK
+2026-04-11 14:15:13.086 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Writing 2 bytes to 108b0002-eab5-bc09-d0ea-0b8f467ce8ee (response=False): 3b00
+2026-04-11 14:15:13.086 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Write OK
+2026-04-11 14:15:13.086 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Command + commit sent successfully
+2026-04-11 14:15:15.224 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Received 6 notification packets
+2026-04-11 14:15:15.224 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Parsed state: battery=81%, station_byte=0xFF, countdown=195, is_irrigating=False, active_station=None
+2026-04-11 14:15:15.225 DEBUG (MainThread) [custom_components.solem_bt_controller.coordinator] RSSI updated: -91 dBm
+2026-04-11 14:15:15.225 DEBUG (MainThread) [custom_components.solem_bt_controller.coordinator] Battery level updated: 81%
+2026-04-11 14:15:15.225 DEBUG (MainThread) [custom_components.solem_bt_controller.coordinator] Device reports no active irrigation
+2026-04-11 14:15:15.225 DEBUG (MainThread) [custom_components.solem_bt_controller.coordinator] Manually updated solem_bt_controller data
+2026-04-11 14:15:37.755 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Reading device state via turn-on command
+2026-04-11 14:15:37.756 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Turn on controller — payload: 310512ff00ffff
+2026-04-11 14:15:37.756 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Resolving BLE device C8:B9:61:F0:15:30 ...
+2026-04-11 14:15:37.756 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Device found via find_device_by_address: C8:B9:61:F0:15:30: quarnaro 14 / 2N
+2026-04-11 14:15:37.756 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Establishing connection to C8:B9:61:F0:15:30: quarnaro 14 / 2N ...
+2026-04-11 14:15:38.131 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Connected. MTU size: 23
+2026-04-11 14:15:40.691 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Writing 7 bytes to 108b0002-eab5-bc09-d0ea-0b8f467ce8ee (response=False): 310512ff00ffff
+2026-04-11 14:15:40.691 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Write OK
+2026-04-11 14:15:40.992 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Writing 2 bytes to 108b0002-eab5-bc09-d0ea-0b8f467ce8ee (response=False): 3b00
+2026-04-11 14:15:40.992 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Write OK
+2026-04-11 14:15:40.992 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Command + commit sent successfully
+2026-04-11 14:15:43.074 DEBUG (MainThread) [custom_components.solem_bt_controller.coordinator] RSSI updated: -92 dBm
+2026-04-11 14:15:43.074 DEBUG (MainThread) [custom_components.solem_bt_controller.coordinator] Device reports no active irrigation
+2026-04-11 14:15:43.074 DEBUG (MainThread) [custom_components.solem_bt_controller.coordinator] Manually updated solem_bt_controller data
+2026-04-11 14:19:03.298 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Reading device state via turn-on command
+2026-04-11 14:19:03.298 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Turn on controller — payload: 310512ff00ffff
+2026-04-11 14:19:03.298 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Resolving BLE device C8:B9:61:F0:15:30 ...
+2026-04-11 14:19:03.298 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Device found via find_device_by_address: C8:B9:61:F0:15:30: quarnaro 14 / 2N
+2026-04-11 14:19:03.298 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Establishing connection to C8:B9:61:F0:15:30: quarnaro 14 / 2N ...
+2026-04-11 14:19:08.295 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Connected. MTU size: 23
+2026-04-11 14:19:08.381 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Writing 7 bytes to 108b0002-eab5-bc09-d0ea-0b8f467ce8ee (response=False): 310512ff00ffff
+2026-04-11 14:19:08.381 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Write OK
+2026-04-11 14:19:08.682 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Writing 2 bytes to 108b0002-eab5-bc09-d0ea-0b8f467ce8ee (response=False): 3b00
+2026-04-11 14:19:08.682 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Write OK
+2026-04-11 14:19:08.682 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Command + commit sent successfully
+2026-04-11 14:19:10.821 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Received 6 notification packets
+2026-04-11 14:19:10.821 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Parsed state: battery=81%, station_byte=0xFF, countdown=255, is_irrigating=False, active_station=None
+2026-04-11 14:19:10.821 DEBUG (MainThread) [custom_components.solem_bt_controller.coordinator] RSSI updated: -41 dBm
+2026-04-11 14:19:10.821 DEBUG (MainThread) [custom_components.solem_bt_controller.coordinator] Battery level updated: 81%
+2026-04-11 14:19:10.821 DEBUG (MainThread) [custom_components.solem_bt_controller.coordinator] Device reports no active irrigation
+2026-04-11 14:19:10.821 DEBUG (MainThread) [custom_components.solem_bt_controller.coordinator] Manually updated solem_bt_controller data
+2026-04-11 14:19:26.566 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Sprinkle station 1 for 10 min — payload: 31052201000affff
+2026-04-11 14:19:26.566 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Resolving BLE device C8:B9:61:F0:15:30 ...
+2026-04-11 14:19:26.566 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Device found via find_device_by_address: C8:B9:61:F0:15:30: quarnaro 14 / 2N
+2026-04-11 14:19:26.566 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Establishing connection to C8:B9:61:F0:15:30: quarnaro 14 / 2N ...
+2026-04-11 14:19:27.323 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Connected. MTU size: 23
+2026-04-11 14:19:27.607 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Writing 8 bytes to 108b0002-eab5-bc09-d0ea-0b8f467ce8ee (response=False): 31052201000affff
+2026-04-11 14:19:27.608 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Write OK
+2026-04-11 14:19:27.910 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Writing 2 bytes to 108b0002-eab5-bc09-d0ea-0b8f467ce8ee (response=False): 3b00
+2026-04-11 14:19:27.910 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Write OK
+2026-04-11 14:19:27.910 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Command + commit sent successfully
+2026-04-11 14:19:30.001 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Received 6 notification packets
+2026-04-11 14:19:30.001 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Parsed state: battery=81%, station_byte=0xFF, countdown=235, is_irrigating=False, active_station=None
+2026-04-11 14:19:30.001 DEBUG (MainThread) [custom_components.solem_bt_controller.coordinator] RSSI updated: -39 dBm
+2026-04-11 14:19:30.001 DEBUG (MainThread) [custom_components.solem_bt_controller.coordinator] Battery level updated: 81%
+2026-04-11 14:19:30.001 DEBUG (MainThread) [custom_components.solem_bt_controller.coordinator] Device reports no active irrigation
+2026-04-11 14:19:30.001 DEBUG (MainThread) [custom_components.solem_bt_controller.coordinator] Manually updated solem_bt_controller data
+2026-04-11 14:19:40.806 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Turn on controller — payload: 310512ff00ffff
+2026-04-11 14:19:40.806 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Resolving BLE device C8:B9:61:F0:15:30 ...
+2026-04-11 14:19:40.806 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Device found via find_device_by_address: C8:B9:61:F0:15:30: quarnaro 14 / 2N
+2026-04-11 14:19:40.806 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Establishing connection to C8:B9:61:F0:15:30: quarnaro 14 / 2N ...
+2026-04-11 14:19:41.159 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Connected. MTU size: 23
+2026-04-11 14:19:41.434 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Writing 7 bytes to 108b0002-eab5-bc09-d0ea-0b8f467ce8ee (response=False): 310512ff00ffff
+2026-04-11 14:19:41.434 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Write OK
+2026-04-11 14:19:41.735 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Writing 2 bytes to 108b0002-eab5-bc09-d0ea-0b8f467ce8ee (response=False): 3b00
+2026-04-11 14:19:41.736 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Write OK
+2026-04-11 14:19:41.736 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Command + commit sent successfully
+2026-04-11 14:19:43.809 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Received 6 notification packets
+2026-04-11 14:19:43.809 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Parsed state: battery=81%, station_byte=0xFF, countdown=255, is_irrigating=False, active_station=None
+2026-04-11 14:19:43.810 DEBUG (MainThread) [custom_components.solem_bt_controller.coordinator] RSSI updated: -39 dBm
+2026-04-11 14:19:43.810 DEBUG (MainThread) [custom_components.solem_bt_controller.coordinator] Battery level updated: 81%
+2026-04-11 14:19:43.810 DEBUG (MainThread) [custom_components.solem_bt_controller.coordinator] Device reports no active irrigation
+2026-04-11 14:19:43.810 DEBUG (MainThread) [custom_components.solem_bt_controller.coordinator] Manually updated solem_bt_controller data
+2026-04-11 14:19:57.692 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Sprinkle station 1 for 10 min — payload: 31052201000affff
+2026-04-11 14:19:57.692 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Resolving BLE device C8:B9:61:F0:15:30 ...
+2026-04-11 14:19:57.693 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Device found via find_device_by_address: C8:B9:61:F0:15:30: quarnaro 14 / 2N
+2026-04-11 14:19:57.693 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Establishing connection to C8:B9:61:F0:15:30: quarnaro 14 / 2N ...
+2026-04-11 14:19:59.373 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Connected. MTU size: 23
+2026-04-11 14:19:59.457 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Writing 8 bytes to 108b0002-eab5-bc09-d0ea-0b8f467ce8ee (response=False): 31052201000affff
+2026-04-11 14:19:59.457 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Write OK
+2026-04-11 14:19:59.758 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Writing 2 bytes to 108b0002-eab5-bc09-d0ea-0b8f467ce8ee (response=False): 3b00
+2026-04-11 14:19:59.758 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Write OK
+2026-04-11 14:19:59.758 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Command + commit sent successfully
+2026-04-11 14:20:01.813 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Received 6 notification packets
+2026-04-11 14:20:01.813 DEBUG (MainThread) [custom_components.solem_bt_controller.api] Parsed state: battery=81%, station_byte=0xFF, countdown=238, is_irrigating=False, active_station=None
+2026-04-11 14:20:01.814 DEBUG (MainThread) [custom_components.solem_bt_controller.coordinator] RSSI updated: -40 dBm
+2026-04-11 14:20:01.814 DEBUG (MainThread) [custom_components.solem_bt_controller.coordinator] Battery level updated: 81%
+2026-04-11 14:20:01.814 DEBUG (MainThread) [custom_components.solem_bt_controller.coordinator] Device reports no active irrigation
+2026-04-11 14:20:01.814 DEBUG (MainThread) [custom_components.solem_bt_controller.coordinator] Manually updated solem_bt_controller data
