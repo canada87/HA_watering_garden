@@ -16,8 +16,9 @@ from .const import CHARACTERISTIC_UUID, DEFAULT_BLUETOOTH_TIMEOUT, NOTIFY_UUID
 
 _LOGGER = logging.getLogger(__name__)
 
-COMMAND_COMMIT_DELAY = 0.3  # seconds between command and commit frame
-NOTIFY_WAIT_SECONDS = 2.0  # seconds to wait for notification packets
+COMMAND_COMMIT_DELAY = 0.3   # seconds between command and commit frame
+INTER_COMMAND_DELAY = 1.0   # seconds between sequential commands in one connection
+NOTIFY_WAIT_SECONDS = 2.0   # seconds to wait for notification packets
 
 
 class APIConnectionError(Exception):
@@ -148,10 +149,11 @@ class SolemBleApi:
         await client.write_gatt_char(CHARACTERISTIC_UUID, payload, response=response)
         _LOGGER.debug("Write OK")
 
-    async def _send_command(self, command: bytes) -> dict:
-        """Connect, subscribe to notify, send command+commit, read state, disconnect.
+    async def _send_commands(self, commands: list[bytes]) -> dict:
+        """Connect, send each command+commit in sequence, read notifications, disconnect.
 
-        Returns parsed state dict with at least 'battery_level' key.
+        All commands share a single BLE connection.
+        Returns parsed state dict from the last set of notifications.
         """
         commit = struct.pack(">BB", 0x3B, 0x00)
         received: list[bytearray] = []
@@ -162,7 +164,7 @@ class SolemBleApi:
         async with self._conn_lock:
             client = await self._connect_client()
             try:
-                # Subscribe to notifications (best-effort — command still sent on failure)
+                # Subscribe to notifications (best-effort — commands still sent on failure)
                 subscribed = False
                 try:
                     await client.start_notify(NOTIFY_UUID, _on_notify)
@@ -170,13 +172,18 @@ class SolemBleApi:
                 except Exception as ex:
                     _LOGGER.warning("Could not subscribe to notifications: %s", ex)
 
-                # Send command + commit
-                await self._write_with_retry(client, command)
-                await asyncio.sleep(COMMAND_COMMIT_DELAY)
-                await self._write_with_retry(client, commit)
-                _LOGGER.debug("Command + commit sent successfully")
+                for i, command in enumerate(commands):
+                    await self._write_with_retry(client, command)
+                    await asyncio.sleep(COMMAND_COMMIT_DELAY)
+                    await self._write_with_retry(client, commit)
+                    _LOGGER.debug(
+                        "Command %d/%d sent: %s", i + 1, len(commands), command.hex()
+                    )
+                    # Short settle between commands (device needs time to process each one)
+                    if i < len(commands) - 1:
+                        await asyncio.sleep(INTER_COMMAND_DELAY)
 
-                # Wait for notification packets
+                # Wait for notification packets from the last command
                 if subscribed:
                     await asyncio.sleep(NOTIFY_WAIT_SECONDS)
                     try:
@@ -185,9 +192,7 @@ class SolemBleApi:
                         pass
 
             except Exception as ex:
-                _LOGGER.error(
-                    "Send command failed (command=%s): %s", command.hex(), ex,
-                )
+                _LOGGER.error("Send commands failed: %s", ex)
                 raise
             finally:
                 try:
@@ -200,20 +205,30 @@ class SolemBleApi:
             return parse_state(received)
         return {"battery_level": None, "raw_packets": []}
 
+    async def _send_command(self, command: bytes) -> dict:
+        """Send a single command. Convenience wrapper around _send_commands."""
+        return await self._send_commands([command])
+
     # -- Public commands (all return parsed state dict) --
 
     async def sprinkle_station(self, station: int, minutes: int) -> dict:
-        """Start irrigation on a single station. Returns device state."""
+        """Start irrigation on a single station.
+
+        Sends Turn On before the Sprinkle command in a single BLE connection —
+        the device ignores Sprinkle if the controller is not explicitly turned on first.
+        Returns device state from notifications.
+        """
         station = max(1, min(16, station))
         minutes = max(1, min(240, minutes))
-        command = struct.pack(
+        turn_on = struct.pack(">HBBBH", 0x3105, 0x12, 0xFF, 0x00, 0xFFFF)
+        sprinkle = struct.pack(
             ">HBBBBH", 0x3105, 0x22, station, 0x00, minutes, 0xFFFF
         )
         _LOGGER.debug(
-            "Sprinkle station %d for %d min — payload: %s",
-            station, minutes, command.hex(),
+            "Sprinkle station %d for %d min (with turn-on preamble) — payload: %s",
+            station, minutes, sprinkle.hex(),
         )
-        return await self._send_command(command)
+        return await self._send_commands([turn_on, sprinkle])
 
     async def stop_manual_sprinkle(self) -> dict:
         """Stop all manual irrigation. Returns device state."""
