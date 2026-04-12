@@ -79,6 +79,12 @@ class SolemCoordinator(DataUpdateCoordinator):
             self.controller.update_battery(battery)
             _LOGGER.debug("Battery level updated: %d%%", battery)
 
+        if not state.get("raw_packets"):
+            # Device sent no notifications — do not interpret silence as "not irrigating".
+            # The caller is responsible for applying optimistic state if needed.
+            _LOGGER.debug("No BLE notifications received — skipping station state update")
+            return
+
         # Update irrigation state from device response
         is_irrigating = state.get("is_irrigating", False)
         active_station = state.get("active_station")
@@ -138,7 +144,13 @@ class SolemCoordinator(DataUpdateCoordinator):
                 )
                 self.async_set_updated_data({})
                 return
-            # No notifications received — apply optimistic state
+            # No notifications received — apply optimistic state.
+            # This is expected when starting from state 0x40 (after a 0x15 soft stop):
+            # the device starts irrigating but does not send state notifications.
+            _LOGGER.debug(
+                "Station %d: no BLE response — applying optimistic Sprinkling state",
+                station_number,
+            )
             for s in self.stations:
                 s.update_state("Stopped")
             station.update_state("Sprinkling")

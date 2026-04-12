@@ -36,9 +36,9 @@ def parse_state(raw_packets: list[bytearray]) -> dict:
     Main fragment (byte 2 = 0x02) layout:
     - Byte 3:  0x42 = active irrigation session; 0x02 = idle/off; 0x40 = session just ended
                (returned after 0x15 stop — device stays warm, not permanently-off)
+    - Byte 9:  active station number (1-based, 1–16) when irrigating; 0x00 when idle.
+               Confirmed from live BLE logs: station 1 → 0x01, idle → 0x00.
     - Byte 10: battery level (0-100 percentage)
-    - Byte 13: active station — station number (1-based) with new 0x12 command;
-               0xFF with old two-command approach; other values during app-initiated sessions
     - Byte 14: countdown timer (0xFF immediately after command start, timer not yet set;
                then decrements ~1/sec; 0xFF when idle; 0x00 after 0x15 stop)
 
@@ -60,7 +60,7 @@ def parse_state(raw_packets: list[bytearray]) -> dict:
             if len(packet) >= 15 and packet[0] == marker and packet[2] == 0x02:
                 state["battery_level"] = packet[10]
 
-                station_byte = packet[13]
+                station_byte = packet[9]   # station number at byte[9], not byte[13]
                 countdown = packet[14]
 
                 # byte[3] == 0x42 is the primary irrigation indicator: the device sets it
@@ -70,8 +70,8 @@ def parse_state(raw_packets: list[bytearray]) -> dict:
                 # after Turn Off where byte[3] reverts to 0x02 but the valve is still open).
                 if packet[3] == 0x42 or (countdown != 0xFF and countdown > 0):
                     state["is_irrigating"] = True
-                    if station_byte != 0xFF:
-                        state["active_station"] = station_byte & 0x0F
+                    if 0 < station_byte <= 16:
+                        state["active_station"] = station_byte
 
                 _LOGGER.debug(
                     "Parsed state: battery=%d%%, station_byte=0x%02X, "
