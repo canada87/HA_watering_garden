@@ -46,10 +46,12 @@ struct.pack(">HBBBH", 0x3105, 0x12, 0xFF, 0x00, 0xFFFF)
 # Avvia stazione X per Y minuti
 struct.pack(">HBBBBH", 0x3105, 0x22, station, 0x00, minutes, 0xFFFF)
 
-# Ferma irrigazione manuale
-struct.pack(">HBBBH", 0x3105, 0x24, 0x00, 0x00, 0xFFFF)
+# Ferma irrigazione (Stop = Turn Off + Turn On nella stessa connessione)
+# 0x24 NON funziona. Si usa 0xC0 seguito da 0x12 per ripristinare lo stato ON.
+struct.pack(">HBBBH", 0x3105, 0xC0, 0x00, 0x00, 0x0000)  # Turn Off
+struct.pack(">HBBBH", 0x3105, 0x12, 0xFF, 0x00, 0xFFFF)  # Turn On (stesso BLE session)
 
-# Spegni controller permanentemente
+# Spegni controller permanentemente (emergency only — richiede app per riattivare)
 struct.pack(">HBBBH", 0x3105, 0xC0, 0x00, 0x00, 0x0000)
 
 # Commit frame (obbligatorio dopo ogni comando)
@@ -121,11 +123,11 @@ Il device risponde "Write OK" ma non apre la valvola se non ha ricevuto Turn On 
 **Turn On BLE NON sveglia il device da stato "permanently off"**  
 Il comando `0x12` (Turn On) è un "arm" della sessione BLE corrente, non un cambio di stato persistente. Se il device è in stato OFF permanente (impostato da `0xC0` / Turn Off da HA o dall'app), il comando `0x12` viene accettato dal device (Write OK + 12 notification packets) ma il device rimane spento (`countdown=0xFF`). Quando si è in questo stato, il device potrebbe accodare il comando Sprinkle e eseguirlo quando l'utente riaccende dalla app. Solo l'app o il pulsante fisico possono portare il device fuori da OFF permanente. Il codice ora rileva questa condizione e NON avvia il safety timer.
 
-**Stop (`0x24`) non ferma la valvola — da investigare**  
-Il comando `0x24` (Stop manual sprinkle) non ferma fisicamente l'irrigazione in nessuno dei test condotti. Il device risponde con `Write OK` e notifiche, ma il countdown continua. Solo `0xC0` (Turn Off permanently) ferma la valvola in modo affidabile. Ipotesi: `0x24` ferma solo sessioni BLE-iniziate con `0x22` nella stessa sessione firmware, ma non sessioni avviate via app o che sono già transizionate allo stato "programma". Da investigare con varianti del comando (es. stazione specifica: `3105 24 01 00 ffff`, oppure trailing `0x0000`).
+**Stop (`0x24`) NON ferma mai la valvola — rimosso**  
+Confermato in tutti i test: `0x24` non ferma l'irrigazione fisica in nessuna condizione, neanche immediatamente dopo uno Sprinkle BLE. Il device risponde `Write OK` ma la valvola resta aperta. Rimosso dal codice.
 
-**Turn Off (`0xC0`) ferma sempre la valvola, ma mette il device in OFF permanente**  
-Dopo `0xC0`, il BLE Turn On (`0x12`) NON porta il device in ON. Solo app o pulsante fisico. Usare Turn Off solo come emergency stop.
+**Stop attuale: `[Turn Off (0xC0) + Turn On (0x12)]` nella stessa connessione BLE**  
+`0xC0` ferma sempre la valvola. Il Turn On inviato subito dopo nella stessa sessione BLE dovrebbe — per analogia con la pattern `[Turn On, Sprinkle]` — ripristinare lo stato "on" del controller. **Da verificare in test**: se dopo questo Stop il successivo Sprinkle funziona senza intervento da app.
 
 **Refresh State e Turn On invocati durante irrigazione la interrompono**  
 Qualsiasi comando BLE successivo a uno Sprinkle in corso (incluso Turn On standalone e Refresh State) ferma l'irrigazione. Non inviare Refresh durante un ciclo.

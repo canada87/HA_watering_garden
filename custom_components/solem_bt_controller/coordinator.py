@@ -168,7 +168,7 @@ class SolemCoordinator(DataUpdateCoordinator):
                 duration_minutes,
             )
             try:
-                await self.api.stop_manual_sprinkle()
+                await self.api.stop_irrigation()
             except APIConnectionError as ex:
                 _LOGGER.error(
                     "Safety stop BLE command failed for station %d: %s",
@@ -189,7 +189,7 @@ class SolemCoordinator(DataUpdateCoordinator):
         reliability on weak BLE signal. Updates state even on BLE failure.
         """
         try:
-            state = await self.api.stop_manual_sprinkle_repeated(attempts=3)
+            state = await self.api.stop_irrigation()
             self._apply_device_state(state)
         except APIConnectionError as ex:
             _LOGGER.error("Failed to stop irrigation: %s", ex)

@@ -246,67 +246,25 @@ class SolemBleApi:
         )
         return await self._send_commands([turn_on, sprinkle])
 
-    async def stop_manual_sprinkle(self) -> dict:
-        """Stop all manual irrigation. Returns device state."""
-        command = struct.pack(">HBBBH", 0x3105, 0x24, 0x00, 0x00, 0xFFFF)
-        _LOGGER.debug("Stop manual sprinkle — payload: %s", command.hex())
-        return await self._send_command(command)
+    async def stop_irrigation(self) -> dict:
+        """Stop active irrigation and attempt to restore the controller to on state.
 
-    async def stop_manual_sprinkle_repeated(self, attempts: int = 3) -> dict:
-        """Send stop command multiple times in a single connection for reliability.
+        0x24 (Stop manual sprinkle) has been confirmed to never stop the valve.
+        0xC0 (Turn Off permanently) reliably stops the valve but leaves the device
+        in permanently-off state, blocking subsequent Sprinkle commands.
 
-        Returns device state from the final set of notifications.
+        This method sends [Turn Off, Turn On] in a single BLE connection, mirroring
+        the [Turn On, Sprinkle] pattern in sprinkle_station(). The hypothesis is that
+        Turn On sent in the same session as Turn Off restores the on state, similar to
+        how Turn On in the same session as Sprinkle is required for the valve to open.
         """
-        command = struct.pack(">HBBBH", 0x3105, 0x24, 0x00, 0x00, 0xFFFF)
-        commit = struct.pack(">BB", 0x3B, 0x00)
-        received: list[bytearray] = []
-
-        def _on_notify(_sender, data: bytearray) -> None:
-            received.append(bytearray(data))
-
+        turn_off = struct.pack(">HBBBH", 0x3105, 0xC0, 0x00, 0x00, 0x0000)
+        turn_on = struct.pack(">HBBBH", 0x3105, 0x12, 0xFF, 0x00, 0xFFFF)
         _LOGGER.debug(
-            "Stop manual sprinkle (repeated %dx) — payload: %s",
-            attempts, command.hex(),
+            "Stop irrigation: Turn Off + Turn On in one session — payloads: %s, %s",
+            turn_off.hex(), turn_on.hex(),
         )
-        async with self._conn_lock:
-            client = await self._connect_client()
-            try:
-                # Subscribe to notifications
-                try:
-                    await client.start_notify(NOTIFY_UUID, _on_notify)
-                except Exception as ex:
-                    _LOGGER.warning("Could not subscribe to notifications: %s", ex)
-
-                for attempt in range(1, attempts + 1):
-                    _LOGGER.debug("Stop attempt %d/%d", attempt, attempts)
-                    await self._write_with_retry(client, command)
-                    await asyncio.sleep(COMMAND_COMMIT_DELAY)
-                    await self._write_with_retry(client, commit)
-                    if attempt < attempts:
-                        await asyncio.sleep(1.0)
-
-                _LOGGER.debug("Stop command sent %d times successfully", attempts)
-                await asyncio.sleep(NOTIFY_WAIT_SECONDS)
-
-                try:
-                    await client.stop_notify(NOTIFY_UUID)
-                except Exception:  # noqa: BLE001
-                    pass
-
-            except Exception as ex:
-                _LOGGER.error("Stop repeated write failed: %s", ex)
-                raise
-            finally:
-                try:
-                    await client.disconnect()
-                except Exception:  # noqa: BLE001
-                    pass
-
-        # Parse state from the last group of notifications
-        if received:
-            _LOGGER.debug("Received %d notification packets from stop", len(received))
-            return parse_state(received)
-        return {"battery_level": None, "raw_packets": []}
+        return await self._send_commands([turn_off, turn_on])
 
     async def turn_on(self) -> dict:
         """Turn on the controller. Returns device state."""
