@@ -34,9 +34,16 @@ def parse_state(raw_packets: list[bytearray]) -> dict:
     Each group has 3 fragments identified by byte 2: 0x02 (main), 0x01, 0x00.
 
     Main fragment (byte 2 = 0x02) layout:
+    - Byte 3:  0x42 = active irrigation session; 0x02 = idle/off
     - Byte 10: battery level (0-100 percentage)
-    - Byte 13: active station — 0xFF = idle, 0xFN = station N active
-    - Byte 14: countdown timer in seconds (0xFF = idle)
+    - Byte 13: active station — 0xFF during BLE-initiated irrigation; other values during
+               app-initiated sessions (not reliably mapped to station number)
+    - Byte 14: countdown timer (0xFF when byte[3]==0x42 immediately after command start,
+               then decrements ~1/sec; 0xFF when idle)
+
+    Irrigation detection uses TWO independent signals (either is sufficient):
+    - byte[3] == 0x42  → device confirmed an active session (reliable, immediate)
+    - countdown != 0xFF and countdown > 0  → timer-based (appears after a brief delay)
     """
     state: dict = {
         "battery_level": None,
@@ -54,10 +61,12 @@ def parse_state(raw_packets: list[bytearray]) -> dict:
                 station_byte = packet[13]
                 countdown = packet[14]
 
-                # countdown != 0xFF means a timed session is active.
-                # station_byte stays 0xFF even during irrigation (device quirk),
-                # so we use countdown alone to detect active irrigation.
-                if countdown != 0xFF and countdown > 0:
+                # byte[3] == 0x42 is the primary irrigation indicator: the device sets it
+                # on all active-session notifications, including immediately after a Sprinkle
+                # command when countdown is still 0xFF (timer not yet initialized).
+                # countdown != 0xFF is a secondary indicator (handles transitional states
+                # after Turn Off where byte[3] reverts to 0x02 but the valve is still open).
+                if packet[3] == 0x42 or (countdown != 0xFF and countdown > 0):
                     state["is_irrigating"] = True
                     if station_byte != 0xFF:
                         state["active_station"] = station_byte & 0x0F
