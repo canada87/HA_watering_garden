@@ -164,13 +164,20 @@ class SolemBleApi:
         async with self._conn_lock:
             client = await self._connect_client()
             try:
-                # Subscribe to notifications (best-effort — commands still sent on failure)
+                # Subscribe to notifications — abort if fails (indicates bad GATT state).
+                # A subscription failure means the connection is broken; continuing
+                # would cause write failures (BleakCharacteristicNotFoundError).
                 subscribed = False
                 try:
                     await client.start_notify(NOTIFY_UUID, _on_notify)
                     subscribed = True
                 except Exception as ex:
-                    _LOGGER.warning("Could not subscribe to notifications: %s", ex)
+                    _LOGGER.warning(
+                        "GATT subscribe failed, aborting connection: %s", ex
+                    )
+                    raise APIConnectionError(
+                        f"GATT subscribe failed: {ex}"
+                    ) from ex
 
                 for i, command in enumerate(commands):
                     await self._write_with_retry(client, command)

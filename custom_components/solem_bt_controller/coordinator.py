@@ -146,10 +146,18 @@ class SolemCoordinator(DataUpdateCoordinator):
             )
         except asyncio.TimeoutError:
             _LOGGER.info(
-                "Safety timeout reached for station %d (%d min)",
+                "Safety timeout reached for station %d (%d min) — sending BLE stop",
                 station_number,
                 duration_minutes,
             )
+            try:
+                await self.api.stop_manual_sprinkle()
+            except APIConnectionError as ex:
+                _LOGGER.error(
+                    "Safety stop BLE command failed for station %d: %s",
+                    station_number,
+                    ex,
+                )
 
         # Only update if this station is still the active one
         if self._active_station == station_number:
