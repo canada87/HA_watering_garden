@@ -116,14 +116,20 @@ Start Station 1 → timer N min → Stop → Start Station 2 → ...
 **Turn On obbligatorio prima di Sprinkle**  
 Il device risponde "Write OK" ma non apre la valvola se non ha ricevuto Turn On nella stessa sessione BLE. Già gestito in `api.sprinkle_station()`.
 
+**Turn On BLE NON sveglia il device da stato "permanently off"**  
+Il comando `0x12` (Turn On) è un "arm" della sessione BLE corrente, non un cambio di stato persistente. Se il device è in stato OFF permanente (impostato da `0xC0` / Turn Off da HA o dall'app), il comando `0x12` viene accettato dal device (Write OK + 12 notification packets) ma il device rimane spento (`countdown=0xFF`). Quando si è in questo stato, il device potrebbe accodare il comando Sprinkle e eseguirlo quando l'utente riaccende dalla app. Solo l'app o il pulsante fisico possono portare il device fuori da OFF permanente. Il codice ora rileva questa condizione e NON avvia il safety timer.
+
 **Stop e Refresh interrompono l'irrigazione**  
 Qualsiasi comando successivo a uno Sprinkle in corso (incluso Turn On e Refresh State) ferma l'irrigazione attiva. Non inviare Refresh durante un ciclo.
 
 **Countdown vs minuti richiesti**  
 Il countdown nella risposta BLE non corrisponde ai minuti passati nel comando (es. 10 minuti richiesti → countdown ~235 sec). Potrebbe essere un cap firmware del device. Da investigare.
 
-**`station_byte` sempre `0x00` durante irrigazione**  
-La stazione attiva non si ricava dal byte 13 come documentato. Il numero di stazione potrebbe essere in byte diversi. Da investigare con i raw hex loggati.
+**`station_byte` sempre `0xFF` durante irrigazione avviata da HA**  
+Durante irrigazione avviata via BLE, `station_byte` (byte 13) rimane `0xFF`. Il codice usa solo il `countdown` (byte 14) per rilevare irrigazione attiva.
+
+**`station_byte` ha valori anomali durante irrigazione avviata dall'app**  
+Durante irrigazione avviata dalla app (non da HA), il byte 13 assume valori come `0xFD`, `0xFC`, `0xFE`. La formula `station_byte & 0x0F` produce 13, 12, 14 — fuori dal range delle stazioni configurate. Il codice ora ignora questi valori senza azzerare lo stato delle stazioni.
 
 **RSSI via `async_last_service_info`**  
 L'RSSI si legge dall'API bluetooth di HA (non dall'oggetto `BLEDevice` che in bleak moderno non espone `.rssi`). Si aggiorna ad ogni comando in `coordinator._update_rssi()`.

@@ -84,14 +84,20 @@ class SolemCoordinator(DataUpdateCoordinator):
         active_station = state.get("active_station")
 
         if is_irrigating and active_station is not None:
-            _LOGGER.debug(
-                "Device reports irrigation active on station %d", active_station,
-            )
-            for s in self.stations:
-                if s.station_number == active_station:
-                    s.update_state("Sprinkling")
-                else:
-                    s.update_state("Stopped")
+            station_found = any(s.station_number == active_station for s in self.stations)
+            if station_found:
+                _LOGGER.debug(
+                    "Device reports irrigation active on station %d", active_station,
+                )
+                for s in self.stations:
+                    s.update_state("Sprinkling" if s.station_number == active_station else "Stopped")
+            else:
+                _LOGGER.debug(
+                    "Device reports irrigation active (station %d out of range — ignoring)",
+                    active_station,
+                )
+        elif is_irrigating and active_station is None:
+            _LOGGER.debug("Device reports irrigation active (station unknown)")
         elif not is_irrigating and active_station is None:
             _LOGGER.debug("Device reports no active irrigation")
             for s in self.stations:
@@ -119,9 +125,20 @@ class SolemCoordinator(DataUpdateCoordinator):
             _LOGGER.error("Failed to start station %d: %s", station_number, ex)
             return
 
-        # If device state didn't set irrigation (e.g. no notifications received),
-        # fall back to optimistic state
+        # If device state didn't set irrigation, either abort or apply optimistic fallback.
         if station.state != "Sprinkling":
+            if state.get("is_irrigating") is False and state.get("raw_packets"):
+                # Device responded but explicitly confirmed NOT irrigating — the controller
+                # is likely in "permanently off" state (Turn Off from HA/app). The BLE
+                # Turn On command does NOT undo this; only the app or physical button can.
+                _LOGGER.warning(
+                    "Station %d: device confirmed irrigation did NOT start. "
+                    "Turn the controller ON from the app before starting irrigation.",
+                    station_number,
+                )
+                self.async_set_updated_data({})
+                return
+            # No notifications received — apply optimistic state
             for s in self.stations:
                 s.update_state("Stopped")
             station.update_state("Sprinkling")
