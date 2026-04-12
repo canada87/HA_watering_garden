@@ -39,17 +39,18 @@ Nessun polling (`update_interval=None`). Le entity si aggiornano solo quando il 
 
 ### Formato comandi (scritti su `108b0002`, `response=False`)
 
+Tutti i comandi confermati da BLE sniff dell'app ufficiale il 2026-04-12.
+
 ```python
-# Accendi controller
-struct.pack(">HBBBH", 0x3105, 0x12, 0xFF, 0x00, 0xFFFF)
+# Turn On persistente (porta il device fuori da OFF permanente)
+struct.pack(">HBBBH", 0x3105, 0xA0, 0x00, 0x00, 0x0000)
 
-# Avvia stazione X per Y minuti
-struct.pack(">HBBBBH", 0x3105, 0x22, station, 0x00, minutes, 0xFFFF)
+# Avvia stazione X per Y minuti — singolo comando, durata in secondi
+struct.pack(">HBBBH", 0x3105, 0x12, station, 0x00, minutes * 60)
+# es. stazione 1, 5 min = 300s = 0x012c → payload: 3105120100012c
 
-# Ferma irrigazione (Stop = Turn Off + Turn On nella stessa connessione)
-# 0x24 NON funziona. Si usa 0xC0 seguito da 0x12 per ripristinare lo stato ON.
-struct.pack(">HBBBH", 0x3105, 0xC0, 0x00, 0x00, 0x0000)  # Turn Off
-struct.pack(">HBBBH", 0x3105, 0x12, 0xFF, 0x00, 0xFFFF)  # Turn On (stesso BLE session)
+# Ferma irrigazione senza mettere device in OFF permanente
+struct.pack(">HBBBH", 0x3105, 0x15, 0x00, 0xFF, 0x0000)
 
 # Spegni controller permanentemente (emergency only — richiede app per riattivare)
 struct.pack(">HBBBH", 0x3105, 0xC0, 0x00, 0x00, 0x0000)
@@ -57,8 +58,6 @@ struct.pack(">HBBBH", 0x3105, 0xC0, 0x00, 0x00, 0x0000)
 # Commit frame (obbligatorio dopo ogni comando)
 struct.pack(">BB", 0x3B, 0x00)
 ```
-
-**CRITICO — Turn On prima di Sprinkle**: il device ignora i comandi Sprinkle se nella stessa sessione BLE non ha ricevuto prima un Turn On. `sprinkle_station()` in `api.py` invia automaticamente `[turn_on, sprinkle]` nella stessa connessione con 1 secondo di pausa (`INTER_COMMAND_DELAY`) tra i due.
 
 **`response=False`**: la caratteristica `108b0002` supporta solo Write Command (senza response). Usare `response=True` causa comportamento indefinito — non tornare a True.
 
@@ -74,13 +73,14 @@ Ogni gruppo ha 3 frammenti identificati da `byte[2]`: `0x02` (principale), `0x01
 
 | Byte | Significato | Note |
 |------|-------------|------|
-| 3  | Tipo frame | `0x42` = sessione irrigazione attiva; `0x02` = idle/off |
-| 5–7 | Session ID | `0xAAAAAA` durante irrigazione; `0x000000` altrimenti |
+| 3  | Tipo frame | `0x42` = sessione irrigazione attiva; `0x02` = idle/off; `0x40` = sessione appena terminata (dopo `0x15`) |
+| 5–7 | Session ID | `0xAAAAAA` durante irrigazione e dopo `0x15`; `0x000000` dopo `0xC0` (OFF permanente) |
 | 10 | Batteria % | es. `0x51` = 81% |
-| 13 | Station byte | `0xFF` durante irrigazione via BLE; valori `0xFC/0xFD/0xFE` durante sessioni app |
-| 14 | Countdown | `0xFF` subito dopo Sprinkle (timer non ancora inizializzato); poi scende ~1/sec; `0xFF` anche in idle/off |
+| 13 | Station byte | numero stazione (1-based) con nuovo comando `0x12`; `0xFF` con vecchio approccio; valori `0xFC/0xFD/0xFE` durante sessioni app |
+| 14 | Countdown | `0xFF` subito dopo Sprinkle (timer non ancora inizializzato); poi scende ~1/sec; `0xFF` in idle; `0x00` dopo `0x15` stop |
 
 `is_irrigating = True` se `byte[3] == 0x42` OR (`countdown != 0xFF` AND `countdown > 0`).  
+`byte[3] == 0x40` = sessione terminata pulitamente (non irrigating).  
 **Il solo countdown NON è sufficiente**: immediatamente dopo un comando Sprinkle accettato, byte[3]=0x42 ma countdown=0xFF. Verificato fisicamente 2026-04-12.
 
 ---
@@ -117,29 +117,28 @@ Start Station 1 → timer N min → Stop → Start Station 2 → ...
 
 ## Comportamenti noti e gotcha
 
-**Turn On obbligatorio prima di Sprinkle**  
-Il device risponde "Write OK" ma non apre la valvola se non ha ricevuto Turn On nella stessa sessione BLE. Già gestito in `api.sprinkle_station()`.
+**Comandi confermati da BLE sniff app ufficiale (2026-04-12)**  
+Vedere sezione "Formato comandi" per la lista completa. I comandi `0x12` (sessione arm), `0x22` (sprinkle), `0x24` (stop manual) sono stati sostituiti/rimossi sulla base dello sniff.
 
-**Turn On BLE NON sveglia il device da stato "permanently off"**  
-Il comando `0x12` (Turn On) è un "arm" della sessione BLE corrente, non un cambio di stato persistente. Se il device è in stato OFF permanente (impostato da `0xC0` / Turn Off da HA o dall'app), il comando `0x12` viene accettato dal device (Write OK + 12 notification packets) ma il device rimane spento (`countdown=0xFF`). Quando si è in questo stato, il device potrebbe accodare il comando Sprinkle e eseguirlo quando l'utente riaccende dalla app. Solo l'app o il pulsante fisico possono portare il device fuori da OFF permanente. Il codice ora rileva questa condizione e NON avvia il safety timer.
+**`0x12` è sia Turn On (arm) che Start Irrigation**  
+Con `station=0xFF, duration=0xFFFF`: arm della sessione BLE (vecchio approccio, non più usato).  
+Con `station=N, duration=seconds`: avvia irrigazione su stazione N per N secondi — questo è il formato che usa l'app, confermato dallo sniff.
+
+**`0xA0` = Turn On persistente**  
+Confermato dallo sniff: l'app invia `0xA0` quando l'utente preme "Turn ON". Porta il device fuori da stato OFF permanente (a differenza del vecchio `0x12` che era solo un arm di sessione). Usare `0xA0` per il pulsante Turn On in HA.
+
+**`0x15` = Stop senza OFF permanente**  
+Confermato dallo sniff: l'app invia `31051500ff0000` per fermare l'irrigazione. Dopo `0x15`: `byte[3]=0x40`, `session_id=0xaaaaaa`, `countdown=0x00`. Il device **non** va in OFF permanente, quindi il comando successivo `0x12` funziona senza intervento dell'app.  
+Confronto con `0xC0`: dopo `0xC0` il device ha `byte[3]=0x02`, `session_id=0x000000` (OFF permanente — richiede app/pulsante fisico per riattivare).
 
 **Stop (`0x24`) NON ferma mai la valvola — rimosso**  
-Confermato in tutti i test: `0x24` non ferma l'irrigazione fisica in nessuna condizione, neanche immediatamente dopo uno Sprinkle BLE. Il device risponde `Write OK` ma la valvola resta aperta. Rimosso dal codice.
+Confermato in tutti i test fisici: `0x24` non ferma l'irrigazione in nessuna condizione. Rimosso dal codice.
 
-**Stop attuale: `0xC0` (Turn Off)**  
-Unico comando che ferma fisicamente la valvola. Dopo questo il device è in OFF permanente: il successivo Sprinkle da HA non funzionerà finché l'utente non rimette la centralina in ON dall'app. Questo è il comportamento confermato — da investigare se esiste un comando che ferma la valvola senza mettere il device in OFF permanente.
+**Refresh State durante irrigazione la interrompe**  
+Qualsiasi comando BLE successivo a un'irrigazione in corso la ferma. Non inviare Refresh durante un ciclo attivo.
 
-**Refresh State e Turn On invocati durante irrigazione la interrompono**  
-Qualsiasi comando BLE successivo a uno Sprinkle in corso (incluso Turn On standalone e Refresh State) ferma l'irrigazione. Non inviare Refresh durante un ciclo.
-
-**Countdown vs minuti richiesti**  
-Il countdown nella risposta BLE non corrisponde ai minuti passati nel comando (es. 10 minuti richiesti → countdown ~235 sec). Potrebbe essere un cap firmware del device. Da investigare.
-
-**`station_byte` sempre `0xFF` durante irrigazione avviata da HA**  
-Durante irrigazione avviata via BLE, `station_byte` (byte 13) rimane `0xFF`. Il codice usa solo il `countdown` (byte 14) per rilevare irrigazione attiva.
-
-**`station_byte` ha valori anomali durante irrigazione avviata dall'app**  
-Durante irrigazione avviata dalla app (non da HA), il byte 13 assume valori come `0xFD`, `0xFC`, `0xFE`. La formula `station_byte & 0x0F` produce 13, 12, 14 — fuori dal range delle stazioni configurate. Il codice ora ignora questi valori senza azzerare lo stato delle stazioni.
+**`station_byte` ha valori anomali durante sessioni avviata dall'app**  
+Durante irrigazione avviata dalla app (non da HA), il byte 13 assume valori come `0xFD`, `0xFC`, `0xFE`. La formula `station_byte & 0x0F` produce 13, 12, 14 — fuori dal range delle stazioni configurate. Il codice ignora questi valori senza azzerare lo stato delle stazioni.
 
 **RSSI via `async_last_service_info`**  
 L'RSSI si legge dall'API bluetooth di HA (non dall'oggetto `BLEDevice` che in bleak moderno non espone `.rssi`). Si aggiorna ad ogni comando in `coordinator._update_rssi()`.

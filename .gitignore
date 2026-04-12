@@ -7,3 +7,5 @@ home-assistant_2026-04-01T09-52-06.955Z.log
 home-assistant_2026-04-01T10-55-50.748Z.log
 home-assistant_2026-04-01T12-33-11.031Z.log
 HA_log.txt
+btsnoop_hci.log
+parse_btsnoop.py

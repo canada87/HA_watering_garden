@@ -34,16 +34,18 @@ def parse_state(raw_packets: list[bytearray]) -> dict:
     Each group has 3 fragments identified by byte 2: 0x02 (main), 0x01, 0x00.
 
     Main fragment (byte 2 = 0x02) layout:
-    - Byte 3:  0x42 = active irrigation session; 0x02 = idle/off
+    - Byte 3:  0x42 = active irrigation session; 0x02 = idle/off; 0x40 = session just ended
+               (returned after 0x15 stop — device stays warm, not permanently-off)
     - Byte 10: battery level (0-100 percentage)
-    - Byte 13: active station — 0xFF during BLE-initiated irrigation; other values during
-               app-initiated sessions (not reliably mapped to station number)
-    - Byte 14: countdown timer (0xFF when byte[3]==0x42 immediately after command start,
-               then decrements ~1/sec; 0xFF when idle)
+    - Byte 13: active station — station number (1-based) with new 0x12 command;
+               0xFF with old two-command approach; other values during app-initiated sessions
+    - Byte 14: countdown timer (0xFF immediately after command start, timer not yet set;
+               then decrements ~1/sec; 0xFF when idle; 0x00 after 0x15 stop)
 
     Irrigation detection uses TWO independent signals (either is sufficient):
     - byte[3] == 0x42  → device confirmed an active session (reliable, immediate)
     - countdown != 0xFF and countdown > 0  → timer-based (appears after a brief delay)
+    byte[3] == 0x40 means session just ended cleanly (after 0x15 stop) — not irrigating.
     """
     state: dict = {
         "battery_level": None,
@@ -230,38 +232,42 @@ class SolemBleApi:
     async def sprinkle_station(self, station: int, minutes: int) -> dict:
         """Start irrigation on a single station.
 
-        Sends Turn On before the Sprinkle command in a single BLE connection —
-        the device ignores Sprinkle if the controller is not explicitly turned on first.
+        Uses the app's single-command format: opcode 0x12 with (station, 0x00, seconds).
+        Duration is in seconds (minutes * 60). No Turn On preamble needed.
+        Confirmed from BLE sniff of the official Solem app (2026-04-12).
         Returns device state from notifications.
         """
         station = max(1, min(16, station))
         minutes = max(1, min(240, minutes))
-        turn_on = struct.pack(">HBBBH", 0x3105, 0x12, 0xFF, 0x00, 0xFFFF)
-        sprinkle = struct.pack(
-            ">HBBBBH", 0x3105, 0x22, station, 0x00, minutes, 0xFFFF
-        )
+        duration_seconds = minutes * 60
+        command = struct.pack(">HBBBH", 0x3105, 0x12, station, 0x00, duration_seconds)
         _LOGGER.debug(
-            "Sprinkle station %d for %d min (with turn-on preamble) — payload: %s",
-            station, minutes, sprinkle.hex(),
+            "Sprinkle station %d for %d min (%d s) — payload: %s",
+            station, minutes, duration_seconds, command.hex(),
         )
-        return await self._send_commands([turn_on, sprinkle])
+        return await self._send_command(command)
 
     async def stop_irrigation(self) -> dict:
-        """Stop active irrigation by sending Turn Off.
+        """Stop active irrigation.
 
-        0x24 (Stop manual sprinkle) is confirmed to never stop the physical valve.
-        0xC0 (Turn Off permanently) is the only command that reliably closes the valve.
-        After this command the device is in permanently-off state — the controller must
-        be turned ON again from the app or physical button before the next Sprinkle.
+        0x15 is the app's stop command — closes the valve without putting the device
+        in permanently-off state, so subsequent Sprinkle commands work immediately.
+        Confirmed from BLE sniff of the official Solem app (2026-04-12).
+        After this command byte[3]=0x40 (not 0x02), session_id remains 0xaaaaaa.
         """
-        command = struct.pack(">HBBBH", 0x3105, 0xC0, 0x00, 0x00, 0x0000)
-        _LOGGER.debug("Stop irrigation (Turn Off) — payload: %s", command.hex())
+        command = struct.pack(">HBBBH", 0x3105, 0x15, 0x00, 0xFF, 0x0000)
+        _LOGGER.debug("Stop irrigation (0x15) — payload: %s", command.hex())
         return await self._send_command(command)
 
     async def turn_on(self) -> dict:
-        """Turn on the controller. Returns device state."""
-        command = struct.pack(">HBBBH", 0x3105, 0x12, 0xFF, 0x00, 0xFFFF)
-        _LOGGER.debug("Turn on controller — payload: %s", command.hex())
+        """Turn on the controller persistently. Returns device state.
+
+        0xA0 is the app's persistent Turn On — brings the device out of permanently-off
+        state (unlike 0x12 which only arms the current BLE session).
+        Confirmed from BLE sniff of the official Solem app (2026-04-12).
+        """
+        command = struct.pack(">HBBBH", 0x3105, 0xA0, 0x00, 0x00, 0x0000)
+        _LOGGER.debug("Turn on controller (0xA0) — payload: %s", command.hex())
         return await self._send_command(command)
 
     async def turn_off_permanent(self) -> dict:
