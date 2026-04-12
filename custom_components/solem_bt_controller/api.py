@@ -247,24 +247,16 @@ class SolemBleApi:
         return await self._send_commands([turn_on, sprinkle])
 
     async def stop_irrigation(self) -> dict:
-        """Stop active irrigation and attempt to restore the controller to on state.
+        """Stop active irrigation by sending Turn Off.
 
-        0x24 (Stop manual sprinkle) has been confirmed to never stop the valve.
-        0xC0 (Turn Off permanently) reliably stops the valve but leaves the device
-        in permanently-off state, blocking subsequent Sprinkle commands.
-
-        This method sends [Turn Off, Turn On] in a single BLE connection, mirroring
-        the [Turn On, Sprinkle] pattern in sprinkle_station(). The hypothesis is that
-        Turn On sent in the same session as Turn Off restores the on state, similar to
-        how Turn On in the same session as Sprinkle is required for the valve to open.
+        0x24 (Stop manual sprinkle) is confirmed to never stop the physical valve.
+        0xC0 (Turn Off permanently) is the only command that reliably closes the valve.
+        After this command the device is in permanently-off state — the controller must
+        be turned ON again from the app or physical button before the next Sprinkle.
         """
-        turn_off = struct.pack(">HBBBH", 0x3105, 0xC0, 0x00, 0x00, 0x0000)
-        turn_on = struct.pack(">HBBBH", 0x3105, 0x12, 0xFF, 0x00, 0xFFFF)
-        _LOGGER.debug(
-            "Stop irrigation: Turn Off + Turn On in one session — payloads: %s, %s",
-            turn_off.hex(), turn_on.hex(),
-        )
-        return await self._send_commands([turn_off, turn_on])
+        command = struct.pack(">HBBBH", 0x3105, 0xC0, 0x00, 0x00, 0x0000)
+        _LOGGER.debug("Stop irrigation (Turn Off) — payload: %s", command.hex())
+        return await self._send_command(command)
 
     async def turn_on(self) -> dict:
         """Turn on the controller. Returns device state."""

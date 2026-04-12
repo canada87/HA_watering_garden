@@ -126,8 +126,8 @@ Il comando `0x12` (Turn On) è un "arm" della sessione BLE corrente, non un camb
 **Stop (`0x24`) NON ferma mai la valvola — rimosso**  
 Confermato in tutti i test: `0x24` non ferma l'irrigazione fisica in nessuna condizione, neanche immediatamente dopo uno Sprinkle BLE. Il device risponde `Write OK` ma la valvola resta aperta. Rimosso dal codice.
 
-**Stop attuale: `[Turn Off (0xC0) + Turn On (0x12)]` nella stessa connessione BLE**  
-`0xC0` ferma sempre la valvola. Il Turn On inviato subito dopo nella stessa sessione BLE dovrebbe — per analogia con la pattern `[Turn On, Sprinkle]` — ripristinare lo stato "on" del controller. **Da verificare in test**: se dopo questo Stop il successivo Sprinkle funziona senza intervento da app.
+**Stop attuale: `0xC0` (Turn Off)**  
+Unico comando che ferma fisicamente la valvola. Dopo questo il device è in OFF permanente: il successivo Sprinkle da HA non funzionerà finché l'utente non rimette la centralina in ON dall'app. Questo è il comportamento confermato — da investigare se esiste un comando che ferma la valvola senza mettere il device in OFF permanente.
 
 **Refresh State e Turn On invocati durante irrigazione la interrompono**  
 Qualsiasi comando BLE successivo a uno Sprinkle in corso (incluso Turn On standalone e Refresh State) ferma l'irrigazione. Non inviare Refresh durante un ciclo.
