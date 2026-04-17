@@ -133,22 +133,21 @@ class SolemCoordinator(DataUpdateCoordinator):
 
         # If device state didn't set irrigation, either abort or apply optimistic fallback.
         if station.state != "Sprinkling":
-            if state.get("is_irrigating") is False and state.get("raw_packets"):
-                # Device responded but explicitly confirmed NOT irrigating — the controller
-                # is likely in "permanently off" state (Turn Off from HA/app). The BLE
-                # Turn On command does NOT undo this; only the app or physical button can.
+            if state.get("is_irrigating") is False and state.get("raw_packets") and not state.get("session_active"):
+                # Device responded with confirmed permanently-off state (session_id=0x000000,
+                # frame_type=0x02). The BLE Turn On command does NOT undo this; only the app
+                # or physical button can reactivate the controller.
                 _LOGGER.warning(
-                    "Station %d: device confirmed irrigation did NOT start. "
+                    "Station %d: device confirmed irrigation did NOT start (session inactive). "
                     "Turn the controller ON from the app before starting irrigation.",
                     station_number,
                 )
                 self.async_set_updated_data({})
                 return
-            # No notifications received — apply optimistic state.
-            # This is expected when starting from state 0x40 (after a 0x15 soft stop):
-            # the device starts irrigating but does not send state notifications.
+            # No notifications received, or device replied with an unrecognized active-session
+            # frame type (e.g. 0x62 under weak RSSI) — apply optimistic state.
             _LOGGER.debug(
-                "Station %d: no BLE response — applying optimistic Sprinkling state",
+                "Station %d: no confirmed BLE state — applying optimistic Sprinkling state",
                 station_number,
             )
             for s in self.stations:

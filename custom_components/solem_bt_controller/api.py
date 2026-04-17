@@ -36,21 +36,28 @@ def parse_state(raw_packets: list[bytearray]) -> dict:
     Main fragment (byte 2 = 0x02) layout:
     - Byte 3:  0x42 = active irrigation session; 0x02 = idle/off; 0x40 = session just ended
                (returned after 0x15 stop — device stays warm, not permanently-off)
+               0x62 observed on weak signal (RSSI < -85 dBm) — session still active.
+    - Byte 5–7: session ID; 0xAAAAAA = active BLE session; 0x000000 = permanently off
     - Byte 9:  active station number (1-based, 1–16) when irrigating; 0x00 when idle.
                Confirmed from live BLE logs: station 1 → 0x01, idle → 0x00.
     - Byte 10: battery level (0-100 percentage)
     - Byte 14: countdown timer (0xFF immediately after command start, timer not yet set;
                then decrements ~1/sec; 0xFF when idle; 0x00 after 0x15 stop)
 
-    Irrigation detection uses TWO independent signals (either is sufficient):
-    - byte[3] == 0x42  → device confirmed an active session (reliable, immediate)
-    - countdown != 0xFF and countdown > 0  → timer-based (appears after a brief delay)
-    byte[3] == 0x40 means session just ended cleanly (after 0x15 stop) — not irrigating.
+    Irrigation detection uses THREE independent signals (any is sufficient):
+    1. byte[3] == 0x42  → device confirmed an active session (reliable, immediate)
+    2. countdown != 0xFF and countdown > 0  → timer-based (appears after a brief delay)
+    3. session_id == 0xAAAAAA + valid station + byte[3] not a known-off frame → catches
+       variant frame types (e.g. 0x62) seen under weak signal conditions
+
+    Known-off frame types: 0x02 (idle/permanently-off), 0x40 (session just ended via 0x15).
     """
     state: dict = {
         "battery_level": None,
         "active_station": None,
         "is_irrigating": False,
+        "session_active": False,
+        "frame_type": None,
         "raw_packets": [p.hex() for p in raw_packets],
     }
 
@@ -59,25 +66,32 @@ def parse_state(raw_packets: list[bytearray]) -> dict:
         for packet in raw_packets:
             if len(packet) >= 15 and packet[0] == marker and packet[2] == 0x02:
                 state["battery_level"] = packet[10]
+                state["frame_type"] = packet[3]
 
                 station_byte = packet[9]   # station number at byte[9], not byte[13]
                 countdown = packet[14]
+                session_id = int.from_bytes(packet[5:8], "big")
+                is_active_session = session_id == 0xAAAAAA
+                state["session_active"] = is_active_session
 
-                # byte[3] == 0x42 is the primary irrigation indicator: the device sets it
-                # on all active-session notifications, including immediately after a Sprinkle
-                # command when countdown is still 0xFF (timer not yet initialized).
-                # countdown != 0xFF is a secondary indicator (handles transitional states
-                # after Turn Off where byte[3] reverts to 0x02 but the valve is still open).
-                if packet[3] == 0x42 or (countdown != 0xFF and countdown > 0):
+                # Known frame types that always mean "not irrigating"
+                _KNOWN_OFF_FRAMES = {0x02, 0x40}
+
+                if (
+                    packet[3] == 0x42
+                    or (countdown != 0xFF and countdown > 0)
+                    or (is_active_session and 0 < station_byte <= 16 and packet[3] not in _KNOWN_OFF_FRAMES)
+                ):
                     state["is_irrigating"] = True
                     if 0 < station_byte <= 16:
                         state["active_station"] = station_byte
 
                 _LOGGER.debug(
                     "Parsed state: battery=%d%%, station_byte=0x%02X, "
-                    "countdown=%d, is_irrigating=%s, active_station=%s | raw: %s",
-                    packet[10], station_byte, countdown,
-                    state["is_irrigating"], state["active_station"],
+                    "countdown=%d, frame_type=0x%02X, session_active=%s, "
+                    "is_irrigating=%s, active_station=%s | raw: %s",
+                    packet[10], station_byte, countdown, packet[3],
+                    is_active_session, state["is_irrigating"], state["active_station"],
                     packet.hex(),
                 )
                 return state
